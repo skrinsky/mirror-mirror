@@ -80,10 +80,22 @@ def process(midi_path: Path, disc, threshold: float, bp_blend: float = 0.8):
     print(f"{midi_path.name} [{mode}]: {len(events)} → {len(filtered)} "
           f"({removed} removed, {100*len(filtered)/max(len(events),1):.0f}% kept)")
 
+    # Combined filtered MIDI
     out_path = midi_path.parent / (midi_path.stem + "_filtered.mid")
     pm = events_to_midi(filtered, tempo)
     pm.write(str(out_path))
     print(f"  → {out_path}")
+
+    # Per-instrument MIDIs
+    config = _DEFAULT_CONFIG
+    for inst_idx, name in enumerate(config.names):
+        inst_events = [e for e in filtered if int(e[1]) == inst_idx]
+        if not inst_events:
+            continue
+        inst_pm = events_to_midi(inst_events, tempo)
+        inst_path = midi_path.parent / f"{midi_path.stem}_{name}_filtered.mid"
+        inst_pm.write(str(inst_path))
+        print(f"  → {inst_path.name}  ({len(inst_events)} notes)")
 
 
 def main():
