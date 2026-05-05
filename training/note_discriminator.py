@@ -19,12 +19,15 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 
+from training.spe_features import spe_note_features
+
 # --------------- constants -----------------------------------------------
 
 FEATURE_NAMES = [
     "amplitude", "duration_s", "pitch", "stem_id", "polyphony",
     "density_100ms", "octave_rank", "duration_zscore", "pitch_rel",
     "hi_conf_flag", "short_flag", "hi_poly_flag",
+    "spe_fired", "spe_max_ratio", "spe_nearest_norm",
 ]
 N_FEATURES = len(FEATURE_NAMES)
 
@@ -258,13 +261,16 @@ def _build_event_features(events: list, tempo_bpm: float) -> np.ndarray:
         dur_z[mask]   = (durs_s[mask]  - dm) / ds
         pitch_r[mask] = (pitches[mask] - pm) / ps
 
-    return np.stack([
+    base = np.stack([
         amps, durs_s, pitches, stem_ids,
         polyphony, density, oct_rank, dur_z, pitch_r,
         (amps > 0.7).astype(np.float32),
         (durs_s < 0.05).astype(np.float32),
         (polyphony > 4).astype(np.float32),
     ], axis=1).astype(np.float32)
+    # SPE columns default to zeros; score_events_with_audio fills real values.
+    spe_zeros = np.zeros((n, 3), dtype=np.float32)
+    return np.concatenate([base, spe_zeros], axis=1)
 
 
 # --------------- inference entry point ----------------------------------
@@ -396,28 +402,48 @@ def score_events_with_audio(
     feats  = _build_event_features(events, tempo_bpm)
     scalar_t = torch.tensor(feats, dtype=torch.float32)
 
-    # Per-instrument log-mel (loaded lazily, None = unavailable)
-    log_mels: dict = {}
+    # Per-instrument: load raw audio + log-mel (lazily, None = unavailable)
+    stem_audios: dict = {}   # inst_idx → (mono float32, sr)
+    log_mels:    dict = {}   # inst_idx → log-mel or None
     for inst_idx, stem_wav in _INST_TO_STEM_WAV.items():
         wav_path = Path(stems_dir) / track_name / stem_wav
-        log_mels[inst_idx] = _load_log_mel(wav_path) if wav_path.exists() else None
+        if wav_path.exists():
+            try:
+                import soundfile as sf
+                _raw, _sr = sf.read(str(wav_path), dtype="float32", always_2d=True)
+                _mono = _raw.mean(axis=1)
+                stem_audios[inst_idx] = (_mono, _sr)
+            except Exception:
+                pass
+            log_mels[inst_idx] = _load_log_mel(wav_path)
+        else:
+            log_mels[inst_idx] = None
 
-    # Build spec tensor: use audio patches where available, zeros otherwise
+    # Build spec tensor and fill SPE features
     n_mel, n_frames = model.n_mel, model.n_frames
-    spec_np = np.zeros((len(events), n_mel, n_frames), dtype=np.float32)
+    spec_np   = np.zeros((len(events), n_mel, n_frames), dtype=np.float32)
     has_audio = np.zeros(len(events), dtype=bool)
 
-    # Group indices by instrument for batch patch extraction
     for inst_idx, lm in log_mels.items():
-        if lm is None:
+        idxs   = [i for i, e in enumerate(events) if int(e[1]) == inst_idx]
+        if not idxs:
             continue
-        idxs    = [i for i, e in enumerate(events) if int(e[1]) == inst_idx]
-        onsets  = np.array([events[i][0] for i in idxs], dtype=np.float32)
-        patches = _extract_mel_patches(lm, onsets, hop_length=hop_length,
-                                        n_frames=n_frames)
-        for j, i in enumerate(idxs):
-            spec_np[i]    = patches[j]
-            has_audio[i]  = True
+        onsets = np.array([events[i][0] for i in idxs], dtype=np.float32)
+
+        # Mel patches
+        if lm is not None:
+            patches = _extract_mel_patches(lm, onsets, hop_length=hop_length,
+                                            n_frames=n_frames)
+            for j, i in enumerate(idxs):
+                spec_np[i]   = patches[j]
+                has_audio[i] = True
+
+        # SPE features (fill columns 12-14 of feats)
+        if inst_idx in stem_audios:
+            _audio, _sr = stem_audios[inst_idx]
+            _spe = spe_note_features(_audio, _sr, onsets)
+            for j, i in enumerate(idxs):
+                feats[i, 12:15] = _spe[j]
 
     spec_t = torch.tensor(spec_np, dtype=torch.float32)
 

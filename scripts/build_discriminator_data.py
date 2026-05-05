@@ -32,6 +32,8 @@ import scipy.io.wavfile
 import scipy.signal
 import soundfile as sf
 
+from training.spe_features import spe_note_features
+
 try:
     import librosa
     def compute_log_mel(audio: np.ndarray, sr: int, n_mels: int, hop_length: int) -> np.ndarray:
@@ -71,6 +73,7 @@ FEATURE_NAMES = [
     "amplitude", "duration_s", "pitch", "stem_id", "polyphony",
     "density_100ms", "octave_rank", "duration_zscore", "pitch_rel",
     "hi_conf_flag", "short_flag", "hi_poly_flag",
+    "spe_fired", "spe_max_ratio", "spe_nearest_norm",
 ]
 N_FEATURES = len(FEATURE_NAMES)
 
@@ -363,7 +366,8 @@ def align_notes(detected, gt_notes, pitch_tol=1, onset_tol=0.05):
 
 # --------------- feature extraction -------------------------------------
 
-def extract_features(note_events, stem_local_id: int) -> np.ndarray:
+def extract_features(note_events, stem_local_id: int,
+                     spe_feats: np.ndarray = None) -> np.ndarray:
     if not note_events:
         return np.zeros((0, N_FEATURES), dtype=np.float32)
     starts  = np.array([e[0] for e in note_events], dtype=np.float32)
@@ -379,13 +383,17 @@ def extract_features(note_events, stem_local_id: int) -> np.ndarray:
     dur_z     = (durs    - durs.mean())    / (durs.std()    + 1e-8)
     pitch_r   = (pitches - pitches.mean()) / (pitches.std() + 1e-8)
 
-    return np.stack([
+    if spe_feats is None:
+        spe_feats = np.zeros((n, 3), dtype=np.float32)
+
+    base = np.stack([
         amps, durs, pitches, np.full(n, stem_local_id, dtype=np.float32),
         polyphony, density, oct_rank, dur_z, pitch_r,
         (amps > 0.7).astype(np.float32),
         (durs < 0.05).astype(np.float32),
         (polyphony > 4).astype(np.float32),
     ], axis=1).astype(np.float32)
+    return np.concatenate([base, spe_feats], axis=1)
 
 
 # --------------- mel spectrogram patches ---------------------------------
@@ -454,6 +462,9 @@ def _process_stem_audio(stem_audio, category, midi_path, track_dir, sr,
     # Apply amp sim once (before augmentations — same model, varied conditions)
     amped = apply_nam_amp(stem_audio, sr, category)
     results    = []
+    # SPE features are computed from the raw stem (matches inference domain).
+    # Precompute onset times from GT so we can look them up after basic-pitch.
+    _spe_cache: dict = {}   # onset_tuple → spe_feats, filled lazily per aug
     for aug_name in augmentations:
         augmented = apply_aug(amped, sr, aug_name)
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -468,7 +479,10 @@ def _process_stem_audio(stem_audio, category, midi_path, track_dir, sr,
         if not note_events:
             continue
         labels     = align_notes(note_events, gt_notes)
-        feats      = extract_features(note_events, stem_local)
+        # SPE features from raw stem (computed once, reused across augmentations)
+        onsets_s   = np.array([e[0] for e in note_events], dtype=np.float32)
+        spe_feats  = spe_note_features(stem_audio, sr, onsets_s)
+        feats      = extract_features(note_events, stem_local, spe_feats)
         labels_arr = np.array(labels, dtype=np.int8)
         log_mel    = compute_log_mel(augmented, sr, n_mels, hop_length)
         patches    = extract_spec_patches(log_mel, note_events, sr, hop_length, n_mels, n_frames)
