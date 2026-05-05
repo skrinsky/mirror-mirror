@@ -457,13 +457,13 @@ def score_events_with_audio(
 
     # Blend with basic-pitch confidence per instrument — keep if EITHER the
     # discriminator OR basic-pitch was confident. Scale varies by instrument:
-    # per-instrument bp_blend scales: bass=0.8, guitar=0.8, other=0.9
+    # per-instrument bp_blend scales: bass=0.8, guitar=0.875, other=0.9
     if bp_blend_scale > 0:
         bp_conf = feats[:, 0]   # amplitude col = basic-pitch confidence 0-1
         inst_ids = np.array([int(e[1]) for e in events])
         scales = np.where(inst_ids == 4, bp_blend_scale,            # bass
                  np.where(inst_ids == 3, 0.9,                     # other/synth
-                 np.where(inst_ids == 2, bp_blend_scale,          # guitar — same as bass
+                 np.where(inst_ids == 2, 0.875,                   # guitar ~75% kept
                  0.0)))                                            # passthrough
         probs = np.maximum(probs, bp_conf * scales)
 
