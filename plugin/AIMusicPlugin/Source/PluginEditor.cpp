@@ -1544,6 +1544,13 @@ struct AdvancedPanel : public juce::Component
 
         // Fine-tune from checkpoint
         styleLabel (lblFineTune);
+        // Auto-fill runs before toggle state is set, so check after
+        if (proc.pretrainCkpt.isEmpty() && proc.repoRoot.exists())
+        {
+            auto candidate = proc.repoRoot.getChildFile ("runs/checkpoints/es_model.pt");
+            if (candidate.existsAsFile())
+                proc.pretrainCkpt = candidate.getFullPathName();
+        }
         chkFineTune.setToggleState (proc.pretrainCkpt.isNotEmpty(), juce::dontSendNotification);
         chkFineTune.setColour (juce::ToggleButton::textColourId, kFg2);
         chkFineTune.onStateChange = [this] {

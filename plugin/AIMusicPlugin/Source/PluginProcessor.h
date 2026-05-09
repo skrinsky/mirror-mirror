@@ -62,6 +62,7 @@ public:
     float  discIntensity  { 0.0f };  // 0 = off, 1 = max filtering
     int    seqLen         { 512 };   // training sequence length
     juce::String pretrainCkpt {};    // if set, resume/fine-tune from this checkpoint
+    juce::File   repoRoot    {};    // discovered repo root, used to locate base checkpoints
 
     // Project / session name — organises all artifacts under runs/{projectName}/
     juce::String projectName { "my_model" };

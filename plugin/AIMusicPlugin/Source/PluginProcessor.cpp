@@ -218,9 +218,12 @@ void AIMusicProcessor::launchServer()
     // 2. Fall back to walking up from plugin binary (works for dev/build installs)
     auto pluginDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
                          .getParentDirectory();
-    auto repoRoot = findRepoRoot (pluginDir);
-    if (repoRoot.exists())
+    auto found = findRepoRoot (pluginDir);
+    if (found.exists())
+    {
+        repoRoot = found;
         tryLaunchServerFromRepoRoot (repoRoot);
+    }
 }
 
 void AIMusicProcessor::processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi)
@@ -344,9 +347,10 @@ void AIMusicProcessor::startProcess (const juce::String& folder,
     audioFolder = folder;
 
     // Discover repo root from the chosen folder and remember it for next launch
-    auto repoRoot = findRepoRoot (juce::File (folder));
-    if (repoRoot.exists())
+    auto found2 = findRepoRoot (juce::File (folder));
+    if (found2.exists())
     {
+        repoRoot = found2;
         if (auto* prefs = getPrefs())
         {
             prefs->setValue ("repoRoot", repoRoot.getFullPathName());
