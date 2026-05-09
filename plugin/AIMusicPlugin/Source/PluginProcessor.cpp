@@ -194,7 +194,8 @@ void AIMusicProcessor::launchServer()
         juce::File compiledRoot { juce::String (AI_REPO_ROOT) };
         if (compiledRoot.getChildFile ("plugin/server.py").existsAsFile())
         {
-            tryLaunchServerFromRepoRoot (compiledRoot);
+            repoRoot = compiledRoot;
+            tryLaunchServerFromRepoRoot (repoRoot);
             return;
         }
     }
@@ -209,7 +210,8 @@ void AIMusicProcessor::launchServer()
             auto root = juce::File (saved);
             if (root.getChildFile ("plugin/server.py").existsAsFile())
             {
-                tryLaunchServerFromRepoRoot (root);
+                repoRoot = root;
+                tryLaunchServerFromRepoRoot (repoRoot);
                 return;
             }
         }
