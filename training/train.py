@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os, sys, glob as globmod, json, math, pickle, random, time, argparse, atexit, signal
+import os, sys, json, math, pickle, random, time, argparse, atexit, signal
 from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional
 from functools import partial
@@ -495,7 +495,6 @@ def main():
     ap.add_argument("--min_params", type=int, default=100000, help="Minimum parameter budget when auto_scale is enabled.")
     ap.add_argument("--patience", type=int, default=25, help="Early stop if val loss does not improve for this many epochs (0 disables).")
     ap.add_argument("--min_delta", type=float, default=1e-4, help="Minimum val-loss improvement to count as improvement (for patience reset).")
-    ap.add_argument("--keep_top_k", type=int, default=3, help="Keep the top-K best checkpoints (by val loss). 0 keeps only the latest best.")
     ap.add_argument("--d_model", type=int, default=None, help="Manual override d_model (disables auto_scale if set).")
     ap.add_argument("--n_layers", type=int, default=None, help="Manual override number of Transformer layers (disables auto_scale if set).")
     ap.add_argument("--n_heads", type=int, default=None, help="Manual override attention heads (disables auto_scale if set).")
@@ -539,19 +538,7 @@ def main():
     atexit.register(_remove_lock)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 
-    # ── clean stale checkpoints from previous runs ────────────
-    # Without this, the keep_top_k pruner mixes old and new checkpoints,
-    # deleting new (worse-loss) saves when old ones from a different run exist.
-    if not args.resume:
-        base, ext = os.path.splitext(SAVE_PATH)
-        stale = globmod.glob(f"{base}_epoch*{ext}")
-        if stale:
-            print(f"Removing {len(stale)} stale checkpoint(s) from previous run")
-            for f in stale:
-                os.remove(f)
-            # remove broken symlink
-            if os.path.islink(SAVE_PATH):
-                os.remove(SAVE_PATH)
+    # nothing to clean up — single-file overwrite strategy
 
     # Allow seq_len override (default 512).
     SEQ_LEN = int(args.seq_len)
@@ -628,7 +615,8 @@ def main():
 
     # DataLoader settings (macOS uses spawn; keep collate_fn picklable)
     if args.num_workers is None:
-        num_workers = 2 if device.type == "cuda" else 0
+        # partial() is picklable so spawn-safe on macOS; use workers for cuda and mps
+        num_workers = 2 if device.type in ("cuda", "mps") else 0
     else:
         num_workers = int(args.num_workers)
 
@@ -706,19 +694,27 @@ def main():
         print(f"Resumed from {args.resume} (epoch {resumed_epoch}, best_val={best_val:.4f}, best_epoch={best_epoch})")
 
     # ── epoch loop helpers ─────────────────────────────────────
-    def run_epoch(loader, split: str):
-        model.train(split == "train")
+    def run_epoch(loader, split: str, report_progress: bool = False,
+                  compute_accuracy: bool = False):
+        is_train = (split == "train")
+        model.train(is_train)
 
-        tot_tok = 0
-        sum_loss, sum_type_loss, sum_val_loss = 0.0, 0.0, 0.0
-        correct_exact = 0
-        correct_type  = 0
-        correct_value = 0
+        sum_loss_tok   = torch.tensor(0.0, device=device)
+        sum_tloss_tok  = torch.tensor(0.0, device=device)
+        sum_vloss_tok  = torch.tensor(0.0, device=device)
+        sum_n_tokens   = torch.tensor(0,   device=device, dtype=torch.long)
+        correct_exact  = 0
+        correct_type   = 0
+        correct_value  = 0
 
         # aux metrics
         aux_count = 0
         sum_aux_loss = 0.0
         sum_aux_mae  = 0.0
+
+        total_batches = len(loader)
+        report_every  = max(1, total_batches // 20)  # emit ~every 5%
+        batch_idx     = 0
 
         for batch in loader:
             x = batch.x.to(device)   # (B,T)
@@ -734,7 +730,7 @@ def main():
             y_type_f  = y_type.reshape(-1)[mask_flat]
             y_local_f = y_local.reshape(-1)[mask_flat]
 
-            with torch.set_grad_enabled(split=="train"):
+            with torch.set_grad_enabled(is_train):
                 type_logits, value_logits, aux_pred = model(x)
 
                 # TYPE loss
@@ -742,75 +738,80 @@ def main():
                 type_loss = F.cross_entropy(tlog, y_type_f, label_smoothing=LABEL_SMOOTH_TYPE)
 
                 # VALUE loss per true-type
-                val_loss_sum = 0.0
-                val_count    = 0
+                val_loss_acc = torch.tensor(0.0, device=device)
+                val_count    = torch.tensor(0,   device=device, dtype=torch.long)
                 y_type_flat  = y_type.reshape(-1)
                 y_local_flat = y_local.reshape(-1)
 
                 for t_idx, head in enumerate(value_logits):
                     h = head.reshape(-1, head.size(-1))
                     sel = (y_type_flat == t_idx) & mask_flat
-                    if sel.any():
+                    n_sel = sel.sum()
+                    if n_sel.item() > 0:
                         tname = type_names[t_idx]
                         ls = LABEL_SMOOTH_PER_TYPE.get(tname, LABEL_SMOOTH_VALUE)
                         ce = F.cross_entropy(h[sel], y_local_flat[sel], label_smoothing=ls)
-                        val_loss_sum += ce * sel.sum()
-                        val_count    += sel.sum()
+                        val_loss_acc = val_loss_acc + ce * n_sel
+                        val_count    = val_count + n_sel
 
-                val_loss = (val_loss_sum / val_count) if val_count > 0 else torch.tensor(0.0, device=x.device)
+                val_loss   = val_loss_acc / val_count.clamp(min=1)
                 token_loss = ALPHA_TYPE * type_loss + ALPHA_VALUE * val_loss
 
-                aux_loss = torch.tensor(0.0, device=x.device)
+                aux_loss = torch.tensor(0.0, device=device)
                 if aux_dim_used > 0 and aux is not None and aux_pred is not None:
                     aux_loss = weighted_huber(aux_pred, aux, aux_wvec, delta=AUX_HUBER_DELTA)
 
                 loss = token_loss + (AUX_LOSS_WEIGHT * aux_loss)
 
-                if split == "train":
+                if is_train:
                     opt.zero_grad(set_to_none=True)
                     loss.backward()
                     nn.utils.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
                     opt.step()
                     sched.step()
 
-            # ── token metrics ────────────────────────────────────
-            n_tokens = mask_flat.sum().item()
-            tot_tok += n_tokens
+            # ── accumulate loss (stay on GPU to avoid sync) ───────
+            n_tok = mask_flat.sum()
+            sum_n_tokens  = sum_n_tokens  + n_tok
+            sum_loss_tok  = sum_loss_tok  + loss.detach()       * n_tok
+            sum_tloss_tok = sum_tloss_tok + type_loss.detach()  * n_tok
+            sum_vloss_tok = sum_vloss_tok + val_loss.detach()   * n_tok
 
-            pred_type = type_logits.argmax(dim=-1)
-            correct_type += (pred_type.reshape(-1)[mask_flat] == y_type_f).sum().item()
+            # ── accuracy metrics (val only, or when explicitly requested) ─
+            if compute_accuracy:
+                with torch.no_grad():
+                    pred_type = type_logits.argmax(dim=-1)
+                    correct_type += (pred_type.reshape(-1)[mask_flat] == y_type_f).sum().item()
 
-            pred_local = torch.zeros_like(pred_type)
-            for t_idx, head in enumerate(value_logits):
-                pl = head.argmax(dim=-1)
-                sel = (pred_type == t_idx)
-                if sel.any():
-                    pred_local[sel] = pl[sel]
+                    pred_local = torch.zeros_like(pred_type)
+                    for t_idx, head in enumerate(value_logits):
+                        sel = (pred_type == t_idx)
+                        if sel.any():
+                            pred_local[sel] = head.argmax(dim=-1)[sel]
 
-            pred_global = reconstruct_global_ids(pred_type, pred_local, starts, type_names)
-            correct_exact += (pred_global.reshape(-1)[mask_flat] == y_flat[mask_flat]).sum().item()
+                    pred_global = reconstruct_global_ids(pred_type, pred_local, starts, type_names)
+                    correct_exact += (pred_global.reshape(-1)[mask_flat] == y_flat[mask_flat]).sum().item()
 
-            value_hits = 0
-            for t_idx, head in enumerate(value_logits):
-                sel_true = ((y_type == t_idx) & id_is_typed)
-                if sel_true.any():
-                    value_hits += (head.argmax(dim=-1)[sel_true] == y_local[sel_true]).sum().item()
-            correct_value += value_hits
+                    for t_idx, head in enumerate(value_logits):
+                        sel_true = ((y_type == t_idx) & id_is_typed)
+                        if sel_true.any():
+                            correct_value += (head.argmax(dim=-1)[sel_true] == y_local[sel_true]).sum().item()
 
-            sum_loss      += loss.item()      * n_tokens
-            sum_type_loss += type_loss.item() * n_tokens
-            sum_val_loss  += val_loss.item()  * n_tokens
+            batch_idx += 1
+            if report_progress and batch_idx % report_every == 0:
+                print(f"BATCH_PROGRESS {batch_idx}/{total_batches}", flush=True)
 
             # ── aux metrics ─────────────────────────────────────
             if aux_dim_used > 0 and aux is not None and aux_pred is not None:
-                B = aux.size(0)
-                aux_count += B
-                sum_aux_loss += aux_loss.item() * B
-                sum_aux_mae  += (aux_pred - aux).abs().mean().item() * B
+                B_size = aux.size(0)
+                aux_count    += B_size
+                sum_aux_loss += aux_loss.item() * B_size
+                sum_aux_mae  += (aux_pred.detach() - aux).abs().mean().item() * B_size
 
-        avg_loss  = sum_loss / max(1, tot_tok)
-        avg_tloss = sum_type_loss / max(1, tot_tok)
-        avg_vloss = sum_val_loss  / max(1, tot_tok)
+        tot_tok = sum_n_tokens.item()
+        avg_loss  = (sum_loss_tok  / sum_n_tokens.clamp(min=1)).item()
+        avg_tloss = (sum_tloss_tok / sum_n_tokens.clamp(min=1)).item()
+        avg_vloss = (sum_vloss_tok / sum_n_tokens.clamp(min=1)).item()
 
         ppl = math.exp(min(20.0, avg_loss))
         acc_exact = correct_exact / max(1, tot_tok)
@@ -825,8 +826,8 @@ def main():
     # ── main training loop ─────────────────────────────────────
     for epoch in range(start_epoch, EPOCHS+1):
         t0 = time.time()
-        tr = run_epoch(train_loader, "train")
-        va = run_epoch(val_loader, "val")
+        tr = run_epoch(train_loader, "train", report_progress=True, compute_accuracy=False)
+        va = run_epoch(val_loader, "val", compute_accuracy=True)
         dt = time.time() - t0
 
         (tr_loss, tr_ppl, tr_acc, tr_tloss, tr_vloss, tr_tacc, tr_vacc, tr_aux_l, tr_aux_mae) = tr
@@ -855,9 +856,7 @@ def main():
             best_epoch = epoch
             epochs_no_improve = 0
 
-            # ── versioned checkpoint save ─────────────────────────
-            base, ext = os.path.splitext(SAVE_PATH)
-            ckpt_path = f"{base}_epoch{epoch:03d}_val{va_loss:.4f}{ext}"
+            # ── overwrite single best checkpoint ──────────────────
             ckpt_payload = {
                 "epoch": epoch,
                 "best_val": best_val,
@@ -891,26 +890,11 @@ def main():
                     "PAD_ID": PAD_ID, "BOS_ID": BOS_ID, "EOS_ID": EOS_ID,
                 }
             }
-            torch.save(ckpt_payload, ckpt_path)
-            # symlink SAVE_PATH → latest best for generate.py compatibility
-            tmp_link = SAVE_PATH + ".tmp"
-            os.symlink(os.path.basename(ckpt_path), tmp_link)
-            os.replace(tmp_link, SAVE_PATH)
+            tmp_path = SAVE_PATH + ".tmp"
+            torch.save(ckpt_payload, tmp_path)
+            os.replace(tmp_path, SAVE_PATH)
 
-            # prune old checkpoints beyond keep_top_k
-            if args.keep_top_k > 0:
-                existing = sorted(globmod.glob(f"{base}_epoch*{ext}"))
-                # parse val loss from filename to sort by quality
-                def _val_from_name(p: str) -> float:
-                    try:
-                        return float(p.rsplit("_val", 1)[1].replace(ext, ""))
-                    except (IndexError, ValueError):
-                        return float("inf")
-                existing.sort(key=_val_from_name)
-                for old in existing[args.keep_top_k:]:
-                    os.remove(old)
-
-            msg += f"  → Saved {os.path.basename(ckpt_path)} at {time.strftime('%H:%M:%S')}"
+            msg += f"  → Saved best (epoch {epoch}, val {va_loss:.4f}) at {time.strftime('%H:%M:%S')}"
         else:
             epochs_no_improve += 1
 
