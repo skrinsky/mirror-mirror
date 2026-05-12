@@ -11,6 +11,10 @@ __pycache__/
 # editor / tool state
 .claude/
 
+# local planning / session notes (not for distribution)
+planning/
+CLAUDE.md
+
 # OS
 .DS_Store
 
