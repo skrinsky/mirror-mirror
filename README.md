@@ -322,11 +322,11 @@ Pass extra flags via `ARGS=...`:
 make blues-train ARGS="--max_d_model 128"
 ```
 
-Shortcut aliases: `bg` blues-generate · `cg` chorale-generate · `cdg` chorale-dense-generate · `fg` ft-generate · `ng` noto-generate · `gen` generate from latest checkpoint.
+Shortcut aliases: `bg` blues-generate · `cg` chorale-generate · `cdg` chorale-dense-generate · `fg` ft-generate · `gen` generate from latest checkpoint.
 
 ### Device selection
 
-Training defaults to `--device auto` (CUDA -> MPS -> CPU). Override with `--device cuda`, `--device mps`, or `--device cpu`. Note: Notochord finetuning is pinned to CPU -- MPS produces NaN loss on that model.
+Training defaults to `--device auto` (CUDA -> MPS -> CPU). Override with `--device cuda`, `--device mps`, or `--device cpu`.
 
 ### Output directories (all git-ignored)
 

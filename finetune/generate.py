@@ -33,7 +33,7 @@ def load_tokenizer(data_dir: Path, tok_class: str):
     cls = getattr(miditok, tok_class, None)
     if cls is None:
         # fallback: try in order
-        for name in ("REMI", "REMIPlus", "MMT"):
+        for name in ("REMI", "REMIPlus"):
             cls = getattr(miditok, name, None)
             if cls is not None:
                 break
