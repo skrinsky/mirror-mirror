@@ -13,7 +13,6 @@ __pycache__/
 
 # local planning / session notes (not for distribution)
 planning/
-CLAUDE.md
 
 # release packaging output
 dist/

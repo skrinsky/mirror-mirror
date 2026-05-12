@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_DIR="${ROOT_DIR}/.venv-ai-music"
+VENV_DIR="${ROOT_DIR}/.venv"
 PYTHON_BIN="${PYTHON_BIN:-python3.10}"   # override if needed: PYTHON_BIN=/opt/homebrew/bin/python3.10
 
 PIPE_DIR="${ROOT_DIR}/vendor/all-in-one-ai-midi-pipeline"
