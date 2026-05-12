@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
-# Mirror Mirror — one-shot installer
-# Downloads everything needed, sets up the Python environment, and builds + installs the plugin.
+# Mirror Mirror — quick installer
+# Downloads the pre-built plugin from GitHub Releases and sets up the Python environment.
+# Does NOT require Xcode, cmake, or JUCE.
 #
 # Usage:
 #   bash install.sh
-#   bash install.sh --dir ~/my-mirror-mirror   # custom install location
+#   bash install.sh --dir ~/my-mirror-mirror
 #
 set -euo pipefail
 
-# ── colours ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
-info()    { echo -e "${CYAN}>>>${NC} $*"; }
-ok()      { echo -e "${GREEN}OK${NC}  $*"; }
-warn()    { echo -e "${YELLOW}WARN${NC} $*"; }
-die()     { echo -e "${RED}ERROR${NC} $*" >&2; exit 1; }
+info() { echo -e "${CYAN}>>>${NC} $*"; }
+ok()   { echo -e "${GREEN}OK${NC}  $*"; }
+die()  { echo -e "${RED}ERROR${NC} $*" >&2; exit 1; }
 
-# ── args ──────────────────────────────────────────────────────────────────────
 INSTALL_DIR="$HOME/mirror-mirror"
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -24,66 +22,20 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-JUCE_VERSION="8.0.3"
-JUCE_DIR="$HOME/JUCE"
 REPO_URL="https://github.com/skrinsky/mirror-mirror.git"
-
-# ── OS detection ──────────────────────────────────────────────────────────────
 OS="$(uname -s)"
-ARCH="$(uname -m)"
 
-if [[ "$OS" == "Darwin" ]]; then
-    PLATFORM="macos"
-elif [[ "$OS" == "Linux" ]]; then
-    PLATFORM="linux"
-else
-    die "Windows is not yet supported by this installer. Please follow the manual build instructions in the README."
-fi
+[[ "$OS" == "Darwin" || "$OS" == "Linux" ]] || \
+    die "Windows is not supported by this installer. See README for manual instructions."
 
 echo ""
-echo "  Mirror Mirror Installer"
-echo "  ========================"
-echo "  Platform : $OS $ARCH"
-echo "  Install  : $INSTALL_DIR"
-echo "  JUCE     : $JUCE_DIR"
+echo "  Mirror Mirror — Quick Installer"
+echo "  ================================"
+echo "  Install dir : $INSTALL_DIR"
 echo ""
-
-# ── macOS: Xcode CLT ──────────────────────────────────────────────────────────
-if [[ "$PLATFORM" == "macos" ]]; then
-    if ! xcode-select -p &>/dev/null; then
-        info "Installing Xcode Command Line Tools (you may see a popup)..."
-        xcode-select --install
-        echo "  Re-run this installer after the Xcode CLT installation completes."
-        exit 0
-    fi
-    ok "Xcode Command Line Tools"
-fi
-
-# ── Homebrew (macOS) ──────────────────────────────────────────────────────────
-if [[ "$PLATFORM" == "macos" ]]; then
-    if ! command -v brew &>/dev/null; then
-        info "Installing Homebrew..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
-    fi
-    ok "Homebrew"
-fi
-
-# ── cmake ─────────────────────────────────────────────────────────────────────
-if ! command -v cmake &>/dev/null; then
-    info "Installing cmake..."
-    if [[ "$PLATFORM" == "macos" ]]; then
-        brew install cmake
-    else
-        sudo apt-get install -y cmake || sudo dnf install -y cmake || die "Could not install cmake — please install it manually."
-    fi
-fi
-ok "cmake $(cmake --version | head -1 | awk '{print $3}')"
 
 # ── git ───────────────────────────────────────────────────────────────────────
-if ! command -v git &>/dev/null; then
-    die "git not found. Install git and re-run."
-fi
+command -v git &>/dev/null || die "git is required. On macOS: install from https://git-scm.com or run 'xcode-select --install'"
 ok "git $(git --version | awk '{print $3}')"
 
 # ── Python 3.10 ───────────────────────────────────────────────────────────────
@@ -99,35 +51,13 @@ for candidate in python3.10 python3 python; do
 done
 
 if [[ -z "$PYTHON_BIN" ]]; then
-    info "Python 3.10 not found — installing via Homebrew..."
-    if [[ "$PLATFORM" == "macos" ]]; then
-        brew install python@3.10
-        PYTHON_BIN="$(brew --prefix)/bin/python3.10"
-    else
-        sudo apt-get install -y python3.10 python3.10-venv || \
-            die "Could not install Python 3.10 — please install it manually."
-        PYTHON_BIN="python3.10"
-    fi
+    echo ""
+    echo "  Python 3.10 is required but was not found."
+    echo "  Download and install it from: https://www.python.org/downloads/"
+    echo "  Then re-run this installer."
+    exit 1
 fi
 ok "Python $($PYTHON_BIN --version)"
-
-# ── JUCE ──────────────────────────────────────────────────────────────────────
-if [[ ! -d "$JUCE_DIR" ]]; then
-    info "Downloading JUCE $JUCE_VERSION to $JUCE_DIR..."
-    TMP_ZIP="$(mktemp /tmp/juce-XXXXXX.zip)"
-    if [[ "$PLATFORM" == "macos" ]]; then
-        JUCE_URL="https://github.com/juce-framework/JUCE/releases/download/${JUCE_VERSION}/juce-${JUCE_VERSION}-osx.zip"
-    else
-        JUCE_URL="https://github.com/juce-framework/JUCE/releases/download/${JUCE_VERSION}/juce-${JUCE_VERSION}-linux.zip"
-    fi
-    curl -fsSL "$JUCE_URL" -o "$TMP_ZIP"
-    TMP_DIR="$(mktemp -d)"
-    unzip -q "$TMP_ZIP" -d "$TMP_DIR"
-    mv "$TMP_DIR/JUCE" "$JUCE_DIR"
-    rm -f "$TMP_ZIP"
-    rm -rf "$TMP_DIR"
-fi
-ok "JUCE $JUCE_VERSION at $JUCE_DIR"
 
 # ── Clone repo ────────────────────────────────────────────────────────────────
 if [[ -d "$INSTALL_DIR/.git" ]]; then
@@ -140,18 +70,65 @@ else
 fi
 ok "Repo at $INSTALL_DIR"
 
-# ── Python venv + dependencies ────────────────────────────────────────────────
+# ── Python environment ────────────────────────────────────────────────────────
 info "Setting up Python environment (this may take a few minutes)..."
 PYTHON_BIN="$PYTHON_BIN" bash "$INSTALL_DIR/scripts/setup_venv.sh"
 ok "Python environment ready"
 
-# ── Build + install plugin ────────────────────────────────────────────────────
-info "Building plugin (Release)..."
-PLUGIN_DIR="$INSTALL_DIR/plugin/AIMusicPlugin"
-BUILD_DIR="$PLUGIN_DIR/build"
-cmake -S "$PLUGIN_DIR" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release
-cmake --build "$BUILD_DIR" --config Release -j"$(sysctl -n hw.logicalcpu 2>/dev/null || nproc 2>/dev/null || echo 4)"
-ok "Plugin built and installed"
+# ── Download pre-built plugin ─────────────────────────────────────────────────
+info "Fetching latest release info from GitHub..."
+RELEASE_JSON="$(curl -fsSL https://api.github.com/repos/skrinsky/mirror-mirror/releases/latest 2>/dev/null || true)"
+
+if [[ -z "$RELEASE_JSON" ]] || echo "$RELEASE_JSON" | grep -q '"message": "Not Found"'; then
+    echo ""
+    echo -e "${YELLOW}No release found on GitHub yet.${NC}"
+    echo "  Build from source with: bash $INSTALL_DIR/install-dev.sh --dir $INSTALL_DIR"
+    exit 0
+fi
+
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+if [[ "$OS" == "Darwin" ]]; then
+    # Install VST3
+    VST3_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*VST3[^"]*"' | grep -o 'https://[^"]*' | head -1)"
+    if [[ -n "$VST3_URL" ]]; then
+        info "Downloading VST3..."
+        curl -fsSL "$VST3_URL" -o "$TMP_DIR/vst3.zip"
+        unzip -qo "$TMP_DIR/vst3.zip" -d "$TMP_DIR/vst3"
+        VST3_DEST="$HOME/Library/Audio/Plug-Ins/VST3"
+        mkdir -p "$VST3_DEST"
+        rm -rf "$VST3_DEST/Mirror Mirror.vst3"
+        cp -r "$TMP_DIR/vst3/Mirror Mirror.vst3" "$VST3_DEST/"
+        ok "VST3 installed to $VST3_DEST"
+    fi
+
+    # Install AU
+    AU_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*AU[^"]*"' | grep -o 'https://[^"]*' | head -1)"
+    if [[ -n "$AU_URL" ]]; then
+        info "Downloading AU..."
+        curl -fsSL "$AU_URL" -o "$TMP_DIR/au.zip"
+        unzip -qo "$TMP_DIR/au.zip" -d "$TMP_DIR/au"
+        AU_DEST="$HOME/Library/Audio/Plug-Ins/Components"
+        mkdir -p "$AU_DEST"
+        rm -rf "$AU_DEST/Mirror Mirror.component"
+        cp -r "$TMP_DIR/au/Mirror Mirror.component" "$AU_DEST/"
+        ok "AU installed to $AU_DEST"
+    fi
+
+elif [[ "$OS" == "Linux" ]]; then
+    VST3_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*VST3[^"]*Linux[^"]*"' | grep -o 'https://[^"]*' | head -1)"
+    if [[ -n "$VST3_URL" ]]; then
+        info "Downloading VST3..."
+        curl -fsSL "$VST3_URL" -o "$TMP_DIR/vst3.zip"
+        unzip -qo "$TMP_DIR/vst3.zip" -d "$TMP_DIR/vst3"
+        VST3_DEST="$HOME/.vst3"
+        mkdir -p "$VST3_DEST"
+        rm -rf "$VST3_DEST/Mirror Mirror.vst3"
+        cp -r "$TMP_DIR/vst3/Mirror Mirror.vst3" "$VST3_DEST/"
+        ok "VST3 installed to $VST3_DEST"
+    fi
+fi
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 echo ""
@@ -159,10 +136,10 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  Mirror Mirror installed successfully!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
-if [[ "$PLATFORM" == "macos" ]]; then
+if [[ "$OS" == "Darwin" ]]; then
     echo "  Plugin installed to:"
-    echo "    ~/Library/Audio/Plug-Ins/VST3/Mirror Mirror.vst3"
-    echo "    ~/Library/Audio/Plug-Ins/Components/Mirror Mirror.component"
+    [[ -n "${VST3_URL:-}" ]] && echo "    ~/Library/Audio/Plug-Ins/VST3/Mirror Mirror.vst3"
+    [[ -n "${AU_URL:-}" ]]   && echo "    ~/Library/Audio/Plug-Ins/Components/Mirror Mirror.component"
 fi
 echo ""
 echo "  Repo location: $INSTALL_DIR"

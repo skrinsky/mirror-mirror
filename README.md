@@ -19,21 +19,29 @@ Everything runs **locally** on your machine. The plugin talks to a small Python 
 
 ## Download & Install
 
-**One-line installer** (macOS/Linux) — clones the repo, installs dependencies, builds and installs the plugin automatically:
+### Quick install (no Xcode required)
+
+Downloads the pre-built plugin from GitHub Releases and sets up the Python environment. Just needs git and Python 3.10.
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.sh)
 ```
 
-Or with a custom install location:
+Custom install location:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.sh) --dir ~/my-mirror-mirror
 ```
 
-Pre-built VST3/AU zips (if you prefer not to build) are on the [Releases page](../../releases).
+### Build from source
 
-To build from source manually, see [Installation](#installation) below.
+Requires Xcode Command Line Tools, cmake, and JUCE. See [Requirements](#requirements) below.
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install-dev.sh)
+```
+
+Pre-built VST3/AU zips are also available on the [Releases page](../../releases) if you want to install manually.
 
 ---
 
