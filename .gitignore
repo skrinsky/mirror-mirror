@@ -4,9 +4,6 @@ __pycache__/
 
 # virtual envs
 .venv/
-.venv-ai-midi/
-.venv-ai-music/
-.venv-train/
 
 # editor / tool state
 .claude/
