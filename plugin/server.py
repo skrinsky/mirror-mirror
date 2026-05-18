@@ -430,19 +430,36 @@ def process(req: ProcessRequest):
             _set_status(message="step 2/3: export MIDI", progress=0.35)
             import shutil
             skip_sids = {Path(fn).stem for fn in req.files_to_skip}
-            new_midi_tracks = [
+            candidate_tracks = [
                 d for d in (midi_data.iterdir() if midi_data.exists() else [])
                 if d.is_dir() and (d.stat().st_mtime >= _run_start or d.name in skip_sids)
             ]
+            # A "ready" track is one that actually contains at least one .mid
+            # file — the vendor pipeline can create the track folder before any
+            # stage fails, so existence of the folder alone is not enough.
+            new_midi_tracks = [d for d in candidate_tracks if any(d.glob("*.mid"))]
+            empty_tracks = [d.name for d in candidate_tracks if d not in new_midi_tracks]
             if not new_midi_tracks:
-                _set_status(stage="error", error="no new MIDI tracks produced — check audio files")
+                if empty_tracks:
+                    err = (f"vendor pipeline produced no MIDI for {len(empty_tracks)} "
+                           f"track(s): {', '.join(empty_tracks[:5])}"
+                           f"{' …' if len(empty_tracks) > 5 else ''} — check stem separation / transcription logs")
+                else:
+                    err = "no new MIDI tracks produced — check audio files"
+                _set_status(stage="error", error=err)
                 return
+            if empty_tracks:
+                print(f"*** [process] {len(empty_tracks)} track(s) produced no MIDI, skipping: "
+                      f"{', '.join(empty_tracks[:5])}{' …' if len(empty_tracks) > 5 else ''}",
+                      flush=True)
             out_path = Path(midi_dir)
             out_path.mkdir(parents=True, exist_ok=True)
+            copied = 0
             for track_dir in new_midi_tracks:
                 for mid in track_dir.glob("*.mid"):
                     shutil.copy2(mid, out_path / mid.name)
-            print(f"[process] exported {len(new_midi_tracks)} tracks to {midi_dir}", flush=True)
+                    copied += 1
+            print(f"[process] exported {copied} MIDI file(s) from {len(new_midi_tracks)} track(s) to {midi_dir}", flush=True)
 
             # Step 3: preprocess → events (progress 0.40 → 1.0)
             _set_status(message="step 3/3: preprocessing", progress=0.40)
