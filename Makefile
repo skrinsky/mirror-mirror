@@ -479,6 +479,18 @@ plugin-uninstall pu: ## Remove installed AU + VST3 from ~/Library/Audio/Plug-Ins
 plugin-validate pv: ## Validate the installed AU with auval (slow, ~30s)
 	auval -v aumu Aimp Smkr
 
+.PHONY: plugin-server ps
+plugin-server ps: ## Run plugin/server.py manually (ARGS="--port 7437 --host 127.0.0.1")
+	$(PYTHON) plugin/server.py --root $(CURDIR) $(ARGS)
+
+.PHONY: plugin-run pR
+plugin-run pR: ## Launch the Standalone app (PLUGIN_CONFIG=Debug|Release, default Release)
+	@CFG=$${PLUGIN_CONFIG:-Release}; \
+	APP="$(PLUGIN_BUILD_DIR)/AIMusicPlugin_artefacts/$$CFG/Standalone/$(PLUGIN_PRODUCT_NAME).app"; \
+	test -d "$$APP" || { echo "ERROR: $$APP not found — run 'make pb' (or 'make pd' for Debug) first"; exit 1; }; \
+	echo ">>> Launching $$APP"; \
+	open "$$APP"
+
 .PHONY: plugin-package
 plugin-package: ## Build Release + zip artifacts + publish GitHub release (VERSION=v0.1.0 required)
 	@test -n "$(VERSION)" || { echo "Usage: make plugin-package VERSION=v0.1.0"; exit 1; }

@@ -21,11 +21,11 @@ CPMAddPackage(
     GIT_TAG 8.0.3
 )
 
-# AU is macOS-only; VST3 is cross-platform
+# AU is macOS-only; VST3 is cross-platform; Standalone runs anywhere as an app
 if(APPLE)
-    set(PLUGIN_FORMATS VST3 AU)
+    set(PLUGIN_FORMATS VST3 AU Standalone)
 else()
-    set(PLUGIN_FORMATS VST3)
+    set(PLUGIN_FORMATS VST3 Standalone)
 endif()
 
 juce_add_plugin(AIMusicPlugin
