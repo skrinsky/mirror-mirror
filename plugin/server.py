@@ -705,6 +705,13 @@ def generate(req: GenerateRequest):
                     print(f"[generate] seed requested but {candidate_seed} not found — generating randomly")
 
             out_mid = out_dir / "generated.mid"
+            import torch as _torch  # local — vocab-detection branch above may not have imported it
+            if _torch.cuda.is_available():
+                _device = "cuda"
+            elif hasattr(_torch.backends, "mps") and _torch.backends.mps.is_available():
+                _device = "mps"
+            else:
+                _device = "cpu"
             cmd = [
                 PYTHON, str(ROOT / "training" / "generate_v2.py"),
                 "--ckpt",            str(Path(req.ckpt).resolve()),
@@ -716,7 +723,7 @@ def generate(req: GenerateRequest):
                 "--force_grid_step",   str(req.grid_straight_step),
                 "--grid_triplet_step", str(req.grid_triplet_step),
                 "--max_tokens",      str(req.max_tokens),
-                "--device",          "cuda" if torch.cuda.is_available() else "cpu",
+                "--device",          _device,
             ]
             if seed_pkl:
                 cmd += ["--seed_pkl", str(Path(seed_pkl).resolve())]
