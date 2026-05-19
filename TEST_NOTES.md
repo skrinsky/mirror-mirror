@@ -4,6 +4,50 @@ Session: 2026-05-18 — testing updated plugin features (new project
 organization + fine-tune flow). Driver: standalone app (newly added),
 manually-launched server for log visibility.
 
+## Status summary
+
+End-to-end pipeline **Process → Train → Generate** validated on the
+Emily Bezar / Vista album (18 mp3s, project `jos_emily_bezar`). See
+*End-to-end validation result* at the bottom for the actual run.
+
+All fixes below are **pending JOS's approval** — they're committed on
+`jos` but the file itself remains tracked so a future squash-merge to
+main keeps these notes available.
+
+| # | Issue | Status | Commit (pending approval) |
+|---|---|---|---|
+| 1 | `/cancel` self-terminates the server | **Open** | — |
+| 2 | Generate w/o project ckpt: no clear error, forces Cancel | **Open** | — |
+| 3 | `daw_setup` startup warnings (Reaper / Ableton wiring broken) | **Open** | — |
+| 4 | Stale doc: `CLAUDE.md` says `.venv-ai-music/`, actual is `.venv/` | **Open** | — |
+| 5 | Standalone silently auto-spawns its own server (hides port ownership) | **Open** | — |
+| 6 | Vendor pipeline: bare `python` for demucs + per-file swallow | **Fixed** | `367300b` (parent), `1eae52d` (submodule `jos-fail-fast`) |
+| 7 | `_run_streaming` keeps only last 3 stdout lines on failure | **Open** | — |
+| 8 | `setup_venv.sh` doesn't install `torchcodec` → demucs save_audio fails | **Fixed** | `754c281` |
+| 9 | "Clear" button label is wrong + silently triggers issue #1 | **Open** | — |
+| 10 | Train button clickable before Process has produced events; misleading error | **Open** | — |
+| 11 | `plugin/server.py` launched `pipeline.py` with bare `python` | **Fixed** | `d9c404b` |
+| 12 | Standalone ⌘-Tab activation doesn't bring main window forward | **Open** | — |
+| 13 | `/generate` UnboundLocalError when `vocab_json` supplied explicitly | **Fixed** | `2f2ce95` |
+| — | Test-environment additions: Standalone format, `make ps`/`pR`/`ps-stop`/`ps-log` | **Landed** | `de10fa4`, `1fe664d` |
+| — | `make ps` foreground → SIGSTOP footgun (now backgrounded by default) | **Fixed** | `1fe664d` |
+| — | `TEST_NOTES.md` tracked so squash-merge to main keeps it | **Landed** | `d38299a` |
+
+**Explicitly still open / not fixed in this session:**
+- **Reaper integration** — `daw_setup.py` tries `pip install python-reapy`
+  in a `uv` venv that has no `pip`, fails silently (issue #3). Reaper
+  auto-insert is therefore broken end-to-end on a fresh setup.
+- **Ableton integration** — `daw_setup.py` AbletonOSC download URL is
+  stale (HTTP 404), same issue #3. Ableton auto-insert also broken.
+- The GUI gating gaps (#2, #10) and the server-killing `/cancel` (#1)
+  and "Clear" misnomer (#9) — all visible to any user the first time
+  they make an honest mistake.
+- The standalone window-activation bug (#12) — papered over with the
+  "Show All Windows" dock workaround; not yet root-caused.
+- The short error-tail in `_run_streaming` (#7) — masked at least
+  three real failures during this session before the relevant fix
+  unmasked them.
+
 ## Test environment additions
 
 Small toolchain changes made during this session to make GUI testing
@@ -261,15 +305,54 @@ state to `~/Library/Application Support/Mirror Mirror.settings`.
 Deleting that file would force-reset window position if the issue
 recurs after window dragging.
 
+### 13. `/generate` UnboundLocalError when `vocab_json` supplied explicitly — FIXED
+
+`plugin/server.py:719` referenced `torch.cuda.is_available()` to
+choose the device for `generate_v2.py`, but `torch` was only imported
+inside the `if vocab_path is None` auto-detection branch above (line
+664). When a caller (curl, or any client) supplies `vocab_json`
+explicitly, the auto-detection branch is skipped and the local
+`torch` is never bound — the endpoint dies with `UnboundLocalError:
+local variable 'torch' referenced before assignment` before
+`generate_v2.py` is even launched.
+
+Side observation while fixing: the device line was
+`"cuda" if torch.cuda.is_available() else "cpu"` — silently dropping
+MPS on Apple Silicon (5-10x slowdown for nothing).
+
+Fixed in `2f2ce95` on `jos`: local `import torch as _torch` directly
+above the cmd list, and the device selection now prefers MPS over CPU
+when CUDA isn't available.
+
+## End-to-end validation result
+
+Driven entirely via `curl` against the manually-launched `make ps`
+server, with the standalone quit so it couldn't compete for the port
+and re-spawn its own (per issue #5). Project name `jos_emily_bezar`,
+audio folder `/Users/jos/Music/Emily Bezar - Vista` (18 mp3s).
+
+| Stage | Duration | Output |
+|---|---|---|
+| **Process** | ~30 min total (~1.5 min/track for step 1) | `runs/jos_emily_bezar/midis/*.mid` (18), `events_train.pkl` 28 MB, `events_val.pkl` 695 KB, `event_vocab.json` |
+| **Train** | ~68 min (39 epochs; early-stopped, patience=10) | `runs/jos_emily_bezar/checkpoints/model.pt` 18 MB; best val_loss **1.500** at epoch 29 |
+| **Generate** | ~5 s | `runs/generated/plugin/4b2a1477/generated.{mid,events.json,wav}` — 13.5 s of MIDI, 6 instruments (5 melodic + drums), real note counts (32/45/5/4 for the larger tracks) |
+
+All three stages produced their expected artefacts. The blues6
+instrument set (voxlead, voxharm, guitar, other, bass, drums) is
+represented in the generated MIDI. FluidSynth was already installed,
+so the WAV preview was also rendered automatically.
+
 ## Open / not yet tested
 
-- `/process` end-to-end on a real audio folder — output locations
-  confirmed from code reading: `runs/{project}/midis/` (per-song MIDI)
-  and `runs/{project}/events/` (training-ready tokens); also
-  `vendor/all-in-one-ai-midi-pipeline/data/{stems,midi}/` for raw
-  per-track artefacts.
-- `/train` on a new project — including the watchdog behavior on
-  sleep/wake.
-- Fine-tune flow end-to-end from the GUI.
-- Project switching: does the GUI cleanly re-bind to a different
-  `runs/{project}/` and pick up its existing checkpoint?
+- **Fine-tune flow** (`finetune/` LoRA pipeline) — not exercised in
+  this session.
+- **GUI-driven** Process → Train → Generate as a full sequence — the
+  end-to-end above was driven from `curl`, not the standalone, after
+  the standalone was killed to keep port 7437 stable (per #1, #5).
+  Worth running through the GUI once the gating fixes (#2, #10) land.
+- **Project switching from the GUI** — does the GUI cleanly re-bind
+  to a different `runs/{project}/` and pick up its existing checkpoint?
+- **Watchdog stall-detection in `/train`** — code path is in
+  `server.py:563-592` but didn't trigger during this run (no stalls).
+- **Reaper / Ableton auto-insert** — both blocked by issue #3 (broken
+  `daw_setup.py`), so they were never reached.
