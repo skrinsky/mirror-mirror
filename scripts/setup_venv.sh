@@ -110,6 +110,11 @@ if [[ "${INSTALL_TORCHCODEC}" == "1" ]]; then
     ${UV_PIP} torchcodec
 fi
 
+# ── Test deps (used by tests/ — httpx is the FastAPI TestClient backend) ──────
+echo
+echo "== Installing test deps (pytest, httpx) =="
+${UV_PIP} "pytest>=7" httpx
+
 # ── Other requirements ─────────────────────────────────────────────────────────
 echo
 echo "== Installing top-level requirements (if present) =="
