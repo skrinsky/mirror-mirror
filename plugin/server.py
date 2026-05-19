@@ -112,7 +112,7 @@ def _run_streaming(cmd: list[str], cwd: Path, parse_fn=None, on_start=None):
             except BrokenPipeError:
                 pass
             tail.append(line)
-            if len(tail) > 20:
+            if len(tail) > 100:
                 tail.pop(0)
             if parse_fn:
                 parse_fn(line)
@@ -307,13 +307,6 @@ def cancel():
         _current_proc.kill()  # SIGKILL — can't be ignored
     _set_status(stage="idle", message="cancelled", error=None,
                 epoch=None, val_loss=None)
-    # Shut down the server after the response is sent so it relaunches
-    # fresh (with any updated code) on the next plugin action.
-    def _shutdown():
-        import time
-        time.sleep(0.4)
-        os._exit(0)
-    threading.Thread(target=_shutdown, daemon=True).start()
     return {"cancelled": True}
 
 
@@ -418,7 +411,7 @@ def process(req: ProcessRequest):
                     _step1_done.set()
                     if not _cancelled.is_set():
                         _set_status(stage="error",
-                                    error=f"vendor pipeline failed ({audio_file.name}): " + " | ".join(tail[-3:]))
+                                    error=f"vendor pipeline failed ({audio_file.name}): " + " | ".join(tail[-10:]))
                     return
 
             _step1_done.set()
@@ -494,7 +487,7 @@ def process(req: ProcessRequest):
             rc, tail = _run_streaming(pre_args, cwd=ROOT, parse_fn=_parse_preprocess_line)
             if rc != 0:
                 if not _cancelled.is_set():
-                    _set_status(stage="error", error="preprocessing failed: " + " | ".join(tail[-3:]))
+                    _set_status(stage="error", error="preprocessing failed: " + " | ".join(tail[-10:]))
                 return
 
             _set_status(stage="done", message="processing complete",
@@ -524,6 +517,18 @@ def train(req: TrainRequest):
             else:
                 events_dir = str((ROOT / req.events_dir).resolve())
                 ckpt_path  = str((ROOT / req.ckpt_path).resolve())
+
+            # Fail fast before launching train.py if the preprocessed events
+            # don't exist — otherwise train.py dies deep inside load_vocab
+            # with a FileNotFoundError that gets reported as "training failed"
+            # (issue #10).
+            vocab_json = Path(events_dir) / "event_vocab.json"
+            if not vocab_json.exists():
+                proj_hint = f"project '{req.project_name}'" if req.project_name.strip() else f"events_dir '{req.events_dir}'"
+                _set_status(stage="error",
+                            error=f"no preprocessed events for {proj_hint} — "
+                                  f"run Process Audio first (expected {vocab_json})")
+                return
 
             while True:   # restart loop — re-enters on watchdog kill
                 # Reset timing state for fresh epoch measurement each run
@@ -601,7 +606,7 @@ def train(req: TrainRequest):
 
                 if rc != 0:
                     if not _cancelled.is_set():
-                        _set_status(stage="error", error="training failed: " + " | ".join(tail[-3:]))
+                        _set_status(stage="error", error="training failed: " + " | ".join(tail[-10:]))
                     return
 
                 _set_status(stage="done", message="training complete", ckpt_path=ckpt_path)
@@ -617,6 +622,16 @@ def train(req: TrainRequest):
 
 @app.post("/generate")
 def generate(req: GenerateRequest):
+    # Fail fast before acquiring the job lock so the lock isn't held by a
+    # job that can't possibly run (issue #2). HTTPException makes the
+    # error visible synchronously instead of via the slower /status poll.
+    if req.ckpt and not Path(req.ckpt).expanduser().resolve().exists():
+        raise HTTPException(
+            400,
+            f"checkpoint not found: {req.ckpt} — train the project first "
+            "(Process Audio → Train), or supply a checkpoint that exists."
+        )
+
     if not _job_lock.acquire(blocking=False):
         raise HTTPException(409, "Another job is already running")
 
@@ -731,7 +746,7 @@ def generate(req: GenerateRequest):
             rc, tail = _run_streaming(cmd, cwd=ROOT)
             if rc != 0:
                 if not _cancelled.is_set():
-                    _set_status(stage="error", error=" | ".join(tail[-5:]) or "generation failed")
+                    _set_status(stage="error", error=" | ".join(tail[-10:]) or "generation failed")
                 return
 
             if not out_mid.exists():

@@ -18,15 +18,20 @@ from pathlib import Path
 _DEPS = ["python-reapy", "python-osc", "mido"]
 
 def _install_deps():
+    # uv-created venvs do not ship `pip`; shell out to `uv pip` instead so
+    # this works in the project's `.venv` (per scripts/setup_venv.sh).
     try:
         subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-q"] + _DEPS,
+            ["uv", "pip", "install", "--python", sys.executable, "-q"] + _DEPS,
             check=True,
             capture_output=True,
         )
         print("[daw_setup] Python deps OK")
+    except FileNotFoundError:
+        print("[daw_setup] uv not on PATH — skipping DAW dep install "
+              "(install uv from https://astral.sh/uv to enable Reaper/Ableton auto-insert)")
     except subprocess.CalledProcessError as e:
-        print(f"[daw_setup] pip install failed: {e.stderr.decode()[:200]}")
+        print(f"[daw_setup] uv pip install failed: {e.stderr.decode()[:200]}")
 
 
 # ── Reaper ────────────────────────────────────────────────────────────────────
@@ -57,8 +62,10 @@ def _setup_reaper():
 
 # ── Ableton Live (AbletonOSC) ─────────────────────────────────────────────────
 
+# ideoforms/AbletonOSC's default branch is `master` (not `main` — the
+# old URL silently 404'd). Update if the upstream ever renames.
 _ABLETONOSC_URL = (
-    "https://github.com/ideoforms/AbletonOSC/archive/refs/heads/main.zip"
+    "https://github.com/ideoforms/AbletonOSC/archive/refs/heads/master.zip"
 )
 _REMOTE_SCRIPTS = (
     Path.home() / "Music/Ableton/User Library/Remote Scripts"
@@ -86,7 +93,7 @@ def _setup_ableton():
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
             with tempfile.TemporaryDirectory() as tmp:
                 zf.extractall(tmp)
-                src = Path(tmp) / "AbletonOSC-main" / "AbletonOSC"
+                src = Path(tmp) / "AbletonOSC-master" / "AbletonOSC"
                 if not src.exists():
                     print("[daw_setup] Unexpected zip layout — skipping AbletonOSC")
                     return

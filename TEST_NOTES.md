@@ -16,37 +16,37 @@ main keeps these notes available.
 
 | # | Issue | Status | Commit (pending approval) |
 |---|---|---|---|
-| 1 | `/cancel` self-terminates the server | **Open** | — |
-| 2 | Generate w/o project ckpt: no clear error, forces Cancel | **Open** | — |
-| 3 | `daw_setup` startup warnings (Reaper / Ableton wiring broken) | **Open** | — |
-| 4 | Stale doc: `CLAUDE.md` says `.venv-ai-music/`, actual is `.venv/` | **Open** | — |
-| 5 | Standalone silently auto-spawns its own server (hides port ownership) | **Open** | — |
+| 1 | `/cancel` self-terminates the server | **Fixed (server)** | Wave 1 commit |
+| 2 | Generate w/o project ckpt: no clear error, forces Cancel | **Fixed (server)** | Wave 1 commit |
+| 3 | `daw_setup` startup warnings (Reaper / Ableton wiring broken) | **Fixed** | Wave 1 commit |
+| 4 | Stale doc: `CLAUDE.md` says `.venv-ai-music/`, actual is `.venv/` | **Fixed** | Wave 1 commit |
+| 5 | Standalone silently auto-spawns its own server (hides port ownership) | **Open (GUI)** | Wave 2 |
 | 6 | Vendor pipeline: bare `python` for demucs + per-file swallow | **Fixed** | `367300b` (parent), `1eae52d` (submodule `jos-fail-fast`) |
-| 7 | `_run_streaming` keeps only last 3 stdout lines on failure | **Open** | — |
+| 7 | `_run_streaming` keeps only last 3 stdout lines on failure | **Fixed** | Wave 1 commit |
 | 8 | `setup_venv.sh` doesn't install `torchcodec` → demucs save_audio fails | **Fixed** | `754c281` |
-| 9 | "Clear" button label is wrong + silently triggers issue #1 | **Open** | — |
-| 10 | Train button clickable before Process has produced events; misleading error | **Open** | — |
+| 9 | "Clear" button label is wrong + silently triggers issue #1 | **Open (GUI; #1 part already fixed)** | Wave 2 |
+| 10 | Train button clickable before Process has produced events; misleading error | **Fixed (server); GUI gating still pending** | Wave 1 commit |
 | 11 | `plugin/server.py` launched `pipeline.py` with bare `python` | **Fixed** | `d9c404b` |
-| 12 | Standalone ⌘-Tab activation doesn't bring main window forward | **Open** | — |
+| 12 | Standalone ⌘-Tab activation doesn't bring main window forward | **Open (GUI)** | Wave 2 |
 | 13 | `/generate` UnboundLocalError when `vocab_json` supplied explicitly | **Fixed** | `2f2ce95` |
 | — | Test-environment additions: Standalone format, `make ps`/`pR`/`ps-stop`/`ps-log` | **Landed** | `de10fa4`, `1fe664d` |
 | — | `make ps` foreground → SIGSTOP footgun (now backgrounded by default) | **Fixed** | `1fe664d` |
 | — | `TEST_NOTES.md` tracked so squash-merge to main keeps it | **Landed** | `d38299a` |
+| — | Unit tests: `tests/test_server.py` + `tests/test_setup.py` (19 tests, ~4s) | **Landed** | `93dce59` |
 
-**Explicitly still open / not fixed in this session:**
-- **Reaper integration** — `daw_setup.py` tries `pip install python-reapy`
-  in a `uv` venv that has no `pip`, fails silently (issue #3). Reaper
-  auto-insert is therefore broken end-to-end on a fresh setup.
-- **Ableton integration** — `daw_setup.py` AbletonOSC download URL is
-  stale (HTTP 404), same issue #3. Ableton auto-insert also broken.
-- The GUI gating gaps (#2, #10) and the server-killing `/cancel` (#1)
-  and "Clear" misnomer (#9) — all visible to any user the first time
-  they make an honest mistake.
-- The standalone window-activation bug (#12) — papered over with the
-  "Show All Windows" dock workaround; not yet root-caused.
-- The short error-tail in `_run_streaming` (#7) — masked at least
-  three real failures during this session before the relevant fix
-  unmasked them.
+**Server-side / docs / setup fixes from Wave 1 (committed together as a single batch):**
+- #1: removed `os._exit(0)` from `/cancel`. Endpoint now cancels the in-flight job and stays alive. Pinned by `TestCancelDoesNotShutdown`.
+- #2: `/generate` returns HTTP 400 with a clear message when `ckpt` doesn't exist. Pinned by `TestGeneratePreconditions`.
+- #3: `daw_setup.py` now uses `uv pip install --python sys.executable …` (works in uv-created venvs that have no `pip`), and the AbletonOSC URL switched from the 404'd `main` to the real default branch `master` (extracted dir name `AbletonOSC-master/` updated to match). Reaper/Ableton auto-insert should now work on a fresh setup.
+- #4: `CLAUDE.md` updated — `.venv-ai-music/` → `.venv/` everywhere, and the dropped reference to a non-existent `setup.bash`.
+- #7: `_run_streaming` tail buffer raised 20→100, error-display slice raised 3→10 (and 5→10 for `/generate`). The original 3-line tail showed only the subprocess startup banner; 10 lines reliably captures the actual traceback.
+- #10: `/train` checks `event_vocab.json` exists before launching `train.py`, sets `stage=error` with a "no preprocessed events for project '<slug>' — run Process Audio first" message. Pinned by `TestTrainPreconditions`. *GUI-side button gating (so the user can't even click Train) is in Wave 2.*
+
+**Still open after Wave 1 (all in the JUCE GUI, deferred to Wave 2):**
+- #5: standalone auto-spawn — needs `MIRROR_MIRROR_NO_SPAWN=1` honored.
+- #9: rename "Clear" → "Cancel" and only show during an active job.
+- #2 / #10 — server side fails fast cleanly now; GUI should *also* disable those buttons when preconditions aren't met (mirror of `/checkpoint_status` for events).
+- #12: ⌘-Tab activation handler in the JUCE Standalone wrapper.
 
 ## Test environment additions
 

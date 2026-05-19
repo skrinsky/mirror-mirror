@@ -10,17 +10,17 @@ The same pipeline is also driven from the terminal via the top-level `Makefile`.
 
 ## Environment
 
-- Python deps live in `.venv-ai-music/` (managed by `uv`, Python 3.10).
-- `make setup` creates the venv via `scripts/setup_venv.sh`. `setup.bash` is an older alternate that uses `.venv/`. **Prefer `make setup`.**
-- The Makefile already sets `PYTHONPATH=$(CURDIR)` and uses `.venv-ai-music/bin/python` directly — no need to activate the venv for `make` targets.
-- For ad-hoc scripts: `source .venv-ai-music/bin/activate`.
+- Python deps live in `.venv/` (managed by `uv`, Python 3.10).
+- `make setup` creates the venv via `scripts/setup_venv.sh`.
+- The Makefile already sets `PYTHONPATH=$(CURDIR)` and uses `.venv/bin/python` directly — no need to activate the venv for `make` targets.
+- For ad-hoc scripts: `source .venv/bin/activate`.
 - Training device: `--device auto` picks CUDA → MPS → CPU.
 
 ## Common commands
 
 ```bash
 # environment
-make setup                 # create .venv-ai-music via uv (idempotent)
+make setup                 # create .venv via uv (idempotent)
 make setup-force           # re-run setup
 make help                  # show every target
 
@@ -99,11 +99,11 @@ Independent from `training/`. Starts from a pre-trained music transformer (defau
 ### `plugin/` — JUCE plugin + Python server
 
 - `plugin/AIMusicPlugin/` — JUCE 8.0.3 source. CMake reads JUCE from `~/JUCE` (or `%USERPROFILE%\JUCE` on Windows). Product is `Mirror Mirror` (manufacturer code `Smkr`, plugin code `Aimp`). Built with `COPY_PLUGIN_AFTER_BUILD TRUE` so each build installs to `~/Library/Audio/Plug-Ins/`. The Makefile parses `PRODUCT_NAME` from CMakeLists so `make pu` follows renames.
-- `plugin/server.py` — FastAPI server (default port 7437). Endpoints: `/health`, `/process`, `/train`, `/status`, `/generate`, `/cancel`, `/midi/{job_id}`. One job at a time (guarded by `_job_lock`). Reuses `.venv-ai-music` for subprocess Python so it picks up the right deps regardless of how it was launched. Includes a watchdog that detects sleep/wake and unresponsive GPUs and restarts training from the last checkpoint.
+- `plugin/server.py` — FastAPI server (default port 7437). Endpoints: `/health`, `/process`, `/train`, `/status`, `/generate`, `/cancel`, `/midi/{job_id}`. One job at a time (guarded by `_job_lock`). Reuses `.venv` for subprocess Python so it picks up the right deps regardless of how it was launched. Includes a watchdog that detects sleep/wake and unresponsive GPUs and restarts training from the last checkpoint.
 - `plugin/daw_insert.py`, `daw_setup.py` — DAW-side helpers (Reaper/Ableton MIDI insertion).
 - Plugin launches the server itself; the server is also runnable manually:
   ```bash
-  source .venv-ai-music/bin/activate
+  source .venv/bin/activate
   python plugin/server.py --root /path/to/mirror-mirror
   ```
 
