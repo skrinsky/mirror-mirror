@@ -50,6 +50,10 @@ OS="$(uname -s)"
 ARCH="$(uname -m)"
 TORCH_CMD=""
 TORCH_LABEL=""
+# torchaudio ≥2.10 routes save_audio through torchcodec, which is NOT installed
+# by `pip install torchaudio`; demucs.separate dies on the first stem write
+# without it. Default ON; the one branch that pins torchaudio 2.2.x flips it off.
+INSTALL_TORCHCODEC=1
 UV_PIP="uv pip install --python ${VENV_PY}"
 
 if [[ "$OS" == "Darwin" ]]; then
@@ -60,9 +64,11 @@ if [[ "$OS" == "Darwin" ]]; then
             TORCH_CMD="${UV_PIP} --upgrade torch torchaudio"
         else
             # PyTorch ≥ 2.3 dropped MPS support for macOS 13; 2.2.x is the last
-            # version that exposes MPS on Ventura.
+            # version that exposes MPS on Ventura. torchcodec wasn't a torchaudio
+            # dependency at that vintage.
             TORCH_LABEL="Apple Silicon + macOS 13 → PyTorch 2.2.x (MPS on Ventura)"
             TORCH_CMD="${UV_PIP} 'torch==2.2.2' 'torchaudio==2.2.2'"
+            INSTALL_TORCHCODEC=0
         fi
     else
         TORCH_LABEL="Intel Mac → latest PyTorch (CPU)"
@@ -97,6 +103,12 @@ fi
 
 echo "  ${TORCH_LABEL}"
 eval "${TORCH_CMD}"
+
+if [[ "${INSTALL_TORCHCODEC}" == "1" ]]; then
+    echo
+    echo "== Installing torchcodec (required by torchaudio≥2.10 save_audio) =="
+    ${UV_PIP} torchcodec
+fi
 
 # ── Other requirements ─────────────────────────────────────────────────────────
 echo
@@ -142,6 +154,19 @@ try:
     print("accelerator:", accel)
 except Exception as e:
     print("torch import FAILED:", e)
+
+try:
+    import torchaudio
+    print("torchaudio:", torchaudio.__version__)
+except Exception as e:
+    print("torchaudio import FAILED:", e)
+
+try:
+    import torchcodec
+    print("torchcodec:", torchcodec.__version__)
+except Exception as e:
+    # OK on the macOS-13 / torchaudio 2.2.x branch; required everywhere else.
+    print("torchcodec import FAILED:", e)
 
 try:
     import torchcrepe
