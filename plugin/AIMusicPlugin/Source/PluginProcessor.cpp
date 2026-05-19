@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <algorithm>
+#include <cstdlib>
 
 #if JUCE_MAC
 # include <AudioUnit/AudioUnit.h>
@@ -218,6 +219,20 @@ void AIMusicProcessor::launchServer()
     discoverRepoRoot();                       // always populate repoRoot first
 
     if (client.isServerReachable()) return;   // server already up — nothing to launch
+
+    // MIRROR_MIRROR_NO_SPAWN=1 → developer mode: don't auto-spawn a hidden
+    // background server. Useful when running `make ps` manually so log
+    // visibility is retained and port ownership stays unambiguous.
+    if (auto* noSpawn = std::getenv ("MIRROR_MIRROR_NO_SPAWN"))
+    {
+        const juce::String v (noSpawn);
+        if (v == "1" || v.equalsIgnoreCase ("true") || v.equalsIgnoreCase ("yes"))
+        {
+            DBG ("[launchServer] MIRROR_MIRROR_NO_SPAWN set — skipping auto-spawn");
+            return;
+        }
+    }
+
     lastServerLaunchMs = juce::Time::currentTimeMillis();
 
     if (repoRoot.exists())

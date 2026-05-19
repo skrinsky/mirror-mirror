@@ -79,6 +79,7 @@ public:
                                    { return client.fetchDiscPreview (eventsDir); }
     std::pair<bool, int> fetchCheckpointStatus()
                                    { return client.fetchCheckpointStatus (projectName); }
+    bool fetchEventsExist()        { return client.fetchEventsExist (projectName); }
 
     // MIDI to send out on next processBlock call (filled from background thread)
     juce::MidiBuffer pendingMidi;

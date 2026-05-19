@@ -137,6 +137,15 @@ std::pair<bool, int> PipelineClient::fetchCheckpointStatus (const juce::String& 
     return {exists, epoch};
 }
 
+bool PipelineClient::fetchEventsExist (const juce::String& projectName)
+{
+    auto encoded = juce::URL::addEscapeChars (projectName, true);
+    auto resp = get ("/events_status?project_name=" + encoded);
+    if (resp.isEmpty()) return false;
+    auto parsed = juce::JSON::parse (resp);
+    return (bool) parsed.getProperty ("exists", false);
+}
+
 juce::String PipelineClient::postGenerate (const juce::String& ckpt,
                                            const juce::String& vocabJson,
                                            const juce::String& seedPkl,

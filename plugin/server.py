@@ -245,6 +245,22 @@ def checkpoint_status(project_name: str = ""):
     return {"exists": True, "epoch": epoch}
 
 
+@app.get("/events_status")
+def events_status(project_name: str = ""):
+    """Return whether preprocessed events exist for a project.
+
+    Mirrors /checkpoint_status. Used by the GUI to gate the Train button
+    so the user can't click it before Process has completed (issue #10).
+    """
+    if project_name.strip():
+        project_slug = re.sub(r"[^\w-]", "_", project_name.strip()) or "default"
+        events_dir = ROOT / "runs" / project_slug / "events"
+    else:
+        events_dir = ROOT / "runs" / "events"
+    vocab_json = events_dir / "event_vocab.json"
+    return {"exists": vocab_json.exists(), "events_dir": str(events_dir)}
+
+
 @app.get("/checkpoint_info")
 def checkpoint_info(ckpt: str):
     import torch

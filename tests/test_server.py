@@ -130,6 +130,17 @@ class TestCheckpointStatus:
         assert body["epoch"] is None
 
 
+class TestEventsStatus:
+    """Mirrors /checkpoint_status. Used by the GUI to gate the Train button."""
+
+    def test_unknown_project_reports_missing(self, client):
+        r = client.get("/events_status", params={"project_name": "definitely_not_a_real_project_xyz"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["exists"] is False
+        assert body["events_dir"].endswith("/events")
+
+
 # ── /train preconditions (issue #10 fix) ────────────────────────────────
 
 class TestTrainPreconditions:

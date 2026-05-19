@@ -47,6 +47,10 @@ public:
     // Returns {exists, epoch} for a project's checkpoint (-1 epoch = unknown)
     std::pair<bool, int> fetchCheckpointStatus (const juce::String& projectName = {});
 
+    // Returns whether preprocessed events (event_vocab.json) exist for a project.
+    // Used by the GUI to gate the Train button (issue #10 GUI side).
+    bool fetchEventsExist (const juce::String& projectName = {});
+
     // Returns job_id on success, empty string on failure
     juce::String postGenerate (const juce::String& ckpt,
                                const juce::String& vocabJson,

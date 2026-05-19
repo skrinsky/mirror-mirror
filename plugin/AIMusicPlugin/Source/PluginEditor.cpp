@@ -2285,6 +2285,8 @@ AIMusicEditor::AIMusicEditor (AIMusicProcessor& p)
     btnAdvanced.setTooltip ("Advanced settings - note filter, sequence length, fine-tune from a base checkpoint.");
     btnSavePreset.setTooltip ("Save the current settings to a preset file.");
     btnLoadPreset.setTooltip ("Load settings from a previously saved preset file.");
+    // Tooltip is set dynamically in updateStatusLabel() to match the
+    // current button text ("Cancel" while busy vs "Clear" on error).
     btnCancel  .setTooltip ("Cancel the currently running job.");
     btnShowMidi.setTooltip ("Show the generated MIDI file in Finder.");
     btnPreview .setTooltip ("Play back the generated MIDI through a basic synth for a quick listen.");
@@ -2816,6 +2818,21 @@ void AIMusicEditor::timerCallback()
         }
     }
 
+    // Refresh button-gating preconditions (events + checkpoint existence).
+    // Triggers: project name changed, a job just ended (state may have moved
+    // from "nothing" → "events ready" or "events ready" → "ckpt ready"), or
+    // every ~10s as a fallback (timer is ~1.5s, so 6 ticks).
+    const bool kRunningEnded = (curStage == "done" || curStage == "error")
+                            && kRunning.contains (prevStage);
+    const bool projectChanged = (proc.projectName != gatingProject);
+    if (projectChanged || kRunningEnded || ++gatingTickCount >= 6)
+    {
+        gatingProject   = proc.projectName;
+        gatingTickCount = 0;
+        eventsExist     = proc.fetchEventsExist();
+        ckptExists      = proc.fetchCheckpointStatus().first;
+    }
+
     prevIsError = curIsError;
     prevStage   = curStage;
 
@@ -2838,6 +2855,7 @@ void AIMusicEditor::updateStatusLabel()
         lblMessage.setText (localErrorMessage,  juce::dontSendNotification);
         btnCancel .setVisible (true);
         btnCancel .setButtonText ("Clear");
+        btnCancel .setTooltip   ("Dismiss this error and return to idle.");
         btnShowMidi.setVisible (false);
         btnPreview  .setVisible (false);
         btnRunProcess.setEnabled (true);
@@ -2894,13 +2912,25 @@ void AIMusicEditor::updateStatusLabel()
     bool busy = (s.stage == "processing" || s.stage == "training" || s.stage == "generating");
     btnCancel.setVisible (busy || s.stage == "error");
     btnCancel.setButtonText (busy ? "Cancel" : "Clear");
+    btnCancel.setTooltip   (busy ? "Cancel the currently running job."
+                                 : "Dismiss this error and return to idle.");
 
     bool serverReady  = (s.stage == "idle" || s.stage == "done" || s.stage == "error");
     bool generating   = (s.stage == "generating");
 
     btnRunProcess.setEnabled (true);
-    btnTrain     .setEnabled (serverReady);
-    btnGenerate  .setEnabled (serverReady);
+    btnTrain     .setEnabled (serverReady && eventsExist);
+    btnGenerate  .setEnabled (serverReady && ckptExists);
+
+    // Tooltips track the gating state so the user sees *why* a button is
+    // disabled instead of having to click it and read a /status error.
+    // Issue #10: Train requires preprocessed events; #2: Generate needs a ckpt.
+    btnTrain.setTooltip (eventsExist
+        ? "Train a model on the preprocessed events for this project."
+        : "Run Process Audio first to produce the events to train on.");
+    btnGenerate.setTooltip (ckptExists
+        ? "Generate MIDI from the trained checkpoint."
+        : "Train the model first to produce a checkpoint to generate from.");
 
     // Freeze all generation parameters while inference is running
     btnBrowseCkpt  .setEnabled (! generating);

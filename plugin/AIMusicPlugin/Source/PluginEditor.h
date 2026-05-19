@@ -95,6 +95,16 @@ private:
     bool         prevIsError { false };
     juce::String localErrorMessage;  // client-side errors that survive the server status poll
 
+    // Cached precondition state — refreshed in timerCallback so the Train and
+    // Generate buttons can be disabled when their preconditions aren't met
+    // (issues #2 and #10 GUI side). Polled at low frequency to keep HTTP
+    // chatter down; refreshed immediately on project-name change or
+    // job-just-ended transition.
+    bool         eventsExist     { false };
+    bool         ckptExists      { false };
+    juce::String gatingProject;          // project name last polled for
+    int          gatingTickCount { 0 };  // counts editor timer ticks since last refresh
+
     void timerCallback() override;
     void mouseDrag (const juce::MouseEvent&) override;
     void updateStatusLabel();

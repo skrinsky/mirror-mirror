@@ -17,17 +17,17 @@ main keeps these notes available.
 | # | Issue | Status | Commit (pending approval) |
 |---|---|---|---|
 | 1 | `/cancel` self-terminates the server | **Fixed (server)** | Wave 1 commit |
-| 2 | Generate w/o project ckpt: no clear error, forces Cancel | **Fixed (server)** | Wave 1 commit |
+| 2 | Generate w/o project ckpt: no clear error, forces Cancel | **Fixed** (server 400 + GUI button gated) | Wave 1 + Wave 2 commits |
 | 3 | `daw_setup` startup warnings (Reaper / Ableton wiring broken) | **Fixed** | Wave 1 commit |
 | 4 | Stale doc: `CLAUDE.md` says `.venv-ai-music/`, actual is `.venv/` | **Fixed** | Wave 1 commit |
-| 5 | Standalone silently auto-spawns its own server (hides port ownership) | **Open (GUI)** | Wave 2 |
+| 5 | Standalone silently auto-spawns its own server (hides port ownership) | **Fixed** (`MIRROR_MIRROR_NO_SPAWN=1` honored) | Wave 2 commit |
 | 6 | Vendor pipeline: bare `python` for demucs + per-file swallow | **Fixed** | `367300b` (parent), `1eae52d` (submodule `jos-fail-fast`) |
 | 7 | `_run_streaming` keeps only last 3 stdout lines on failure | **Fixed** | Wave 1 commit |
 | 8 | `setup_venv.sh` doesn't install `torchcodec` → demucs save_audio fails | **Fixed** | `754c281` |
-| 9 | "Clear" button label is wrong + silently triggers issue #1 | **Open (GUI; #1 part already fixed)** | Wave 2 |
-| 10 | Train button clickable before Process has produced events; misleading error | **Fixed (server); GUI gating still pending** | Wave 1 commit |
+| 9 | "Clear" button label is wrong + silently triggers issue #1 | **Fixed** (tooltip now matches label; #1 server-kill already gone) | Wave 2 commit |
+| 10 | Train button clickable before Process has produced events; misleading error | **Fixed** (server fail-fast + GUI button gated) | Wave 1 + Wave 2 commits |
 | 11 | `plugin/server.py` launched `pipeline.py` with bare `python` | **Fixed** | `d9c404b` |
-| 12 | Standalone ⌘-Tab activation doesn't bring main window forward | **Open (GUI)** | Wave 2 |
+| 12 | Standalone ⌘-Tab activation doesn't bring main window forward | **Deferred** (JUCE has no built-in reopen handler; needs Obj-C delegate injection) | — |
 | 13 | `/generate` UnboundLocalError when `vocab_json` supplied explicitly | **Fixed** | `2f2ce95` |
 | — | Test-environment additions: Standalone format, `make ps`/`pR`/`ps-stop`/`ps-log` | **Landed** | `de10fa4`, `1fe664d` |
 | — | `make ps` foreground → SIGSTOP footgun (now backgrounded by default) | **Fixed** | `1fe664d` |
@@ -42,11 +42,13 @@ main keeps these notes available.
 - #7: `_run_streaming` tail buffer raised 20→100, error-display slice raised 3→10 (and 5→10 for `/generate`). The original 3-line tail showed only the subprocess startup banner; 10 lines reliably captures the actual traceback.
 - #10: `/train` checks `event_vocab.json` exists before launching `train.py`, sets `stage=error` with a "no preprocessed events for project '<slug>' — run Process Audio first" message. Pinned by `TestTrainPreconditions`. *GUI-side button gating (so the user can't even click Train) is in Wave 2.*
 
-**Still open after Wave 1 (all in the JUCE GUI, deferred to Wave 2):**
-- #5: standalone auto-spawn — needs `MIRROR_MIRROR_NO_SPAWN=1` honored.
-- #9: rename "Clear" → "Cancel" and only show during an active job.
-- #2 / #10 — server side fails fast cleanly now; GUI should *also* disable those buttons when preconditions aren't met (mirror of `/checkpoint_status` for events).
-- #12: ⌘-Tab activation handler in the JUCE Standalone wrapper.
+**Wave 2 (JUCE GUI + matching server endpoints):**
+- #5: `PluginProcessor::launchServer()` now checks `MIRROR_MIRROR_NO_SPAWN`; when set to `1`/`true`/`yes` the standalone refuses to auto-spawn a hidden server, so `make ps` keeps port ownership during dev. Default behavior (auto-spawn) unchanged.
+- #9: existing button already toggled label "Cancel" ↔ "Clear" by busy state, but the *tooltip* was a static "Cancel the currently running job." even when the button said "Clear". Tooltip now tracks the label: *"Dismiss this error and return to idle."* when showing "Clear", original wording when showing "Cancel". The misleading server-kill behavior is gone with the Wave 1 `/cancel` fix.
+- #10 / #2 GUI side: new `/events_status` endpoint (mirrors `/checkpoint_status`); `PipelineClient::fetchEventsExist`. Editor caches both results in `eventsExist` / `ckptExists`, refreshed every ~10s + on project-name change + on job-end. Train is disabled unless events exist; Generate is disabled unless a checkpoint exists. Each disabled button shows a tooltip naming the missing precondition. Pinned by `TestEventsStatus`.
+
+**Still open (one):**
+- #12: ⌘-Tab activation. JUCE's app delegate only implements `applicationDidBecomeActive:`, not `applicationShouldHandleReopen:hasVisibleWindows:`. Fixing this requires injecting an Obj-C method into JUCE's NSApplicationDelegate (a `.mm` file + method swizzling or category extension on the JUCE-private delegate class). The cost-benefit is uncertain since the original observation may have been triggered by an iTerm2 modal panel rather than a deterministic JUCE bug. Workaround remains: Dock right-click → Show All Windows.
 
 ## Test environment additions
 
