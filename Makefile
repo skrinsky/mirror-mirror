@@ -479,9 +479,34 @@ plugin-uninstall pu: ## Remove installed AU + VST3 from ~/Library/Audio/Plug-Ins
 plugin-validate pv: ## Validate the installed AU with auval (slow, ~30s)
 	auval -v aumu Aimp Smkr
 
+PS_LOG := /tmp/mirror-mirror-server.log
+
 .PHONY: plugin-server ps
-plugin-server ps: ## Run plugin/server.py manually (ARGS="--port 7437 --host 127.0.0.1")
-	$(PYTHON) plugin/server.py --root $(CURDIR) $(ARGS)
+plugin-server ps: ## Run plugin/server.py in the background (logs: /tmp/mirror-mirror-server.log)
+	@if lsof -ti :7437 >/dev/null 2>&1; then \
+	  echo "*** server already running on :7437 (pid $$(lsof -ti :7437)) — use 'make ps-stop' first"; \
+	  exit 1; \
+	fi
+	@nohup $(PYTHON) plugin/server.py --root $(CURDIR) $(ARGS) > $(PS_LOG) 2>&1 &
+	@sleep 1
+	@pid=$$(lsof -ti :7437 2>/dev/null); \
+	if [ -n "$$pid" ]; then \
+	  echo ">>> Server started (pid $$pid).  Tail logs:  make ps-log   Stop:  make ps-stop"; \
+	else \
+	  echo "*** server did not bind :7437 — check $(PS_LOG)"; \
+	  exit 1; \
+	fi
+
+.PHONY: plugin-server-stop ps-stop
+plugin-server-stop ps-stop: ## Stop the backgrounded plugin server (if any)
+	@pid=$$(lsof -ti :7437 2>/dev/null); \
+	if [ -n "$$pid" ]; then kill $$pid && echo ">>> killed pid $$pid"; \
+	else echo "no server on :7437"; fi
+
+.PHONY: plugin-server-log ps-log
+plugin-server-log ps-log: ## Tail the backgrounded server log (Ctrl-C to stop tailing)
+	@test -f $(PS_LOG) || { echo "no log at $(PS_LOG) — server not started?"; exit 1; }
+	@tail -f $(PS_LOG)
 
 .PHONY: plugin-run pR
 plugin-run pR: ## Launch the Standalone app (PLUGIN_CONFIG=Debug|Release, default Release)
