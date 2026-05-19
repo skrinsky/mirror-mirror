@@ -411,7 +411,7 @@ def process(req: ProcessRequest):
 
             for audio_file in files_to_run:
                 rc, tail = _run_streaming(
-                    ["python", "pipeline.py", "run-batch", str(audio_file)] + extra,
+                    [PYTHON, "pipeline.py", "run-batch", str(audio_file)] + extra,
                     cwd=pipe_dir,
                 )
                 if rc != 0:
