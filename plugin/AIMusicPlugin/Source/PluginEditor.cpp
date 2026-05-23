@@ -4,7 +4,7 @@ static const juce::Colour kBg  { 0xff1e1e2e };
 static const juce::Colour kFg  { 0xffcdd6f4 };
 static const juce::Colour kAcc { 0xff89b4fa };
 
-// ── Mirror Mirror animation ───────────────────────────────────────────────────
+// ── MirrorMirror animation ───────────────────────────────────────────────────
 struct MirrorMirror : public juce::Component, public juce::TooltipClient, private juce::Timer
 {
     float phase          = 0.0f;
@@ -2446,9 +2446,9 @@ void AIMusicEditor::paint (juce::Graphics& g)
     // Soft purple glow behind text
     g.setColour (juce::Colour (0xffaa77ff).withAlpha (0.18f + 0.07f * std::sin (tPhase * 0.4f)));
     g.setFont (juce::Font (16.5f, juce::Font::bold));
-    g.drawText ("Mirror Mirror", titleRect.translated (0, 1), juce::Justification::centred);
+    g.drawText ("MirrorMirror", titleRect.translated (0, 1), juce::Justification::centred);
     g.setColour (kFg);
-    g.drawText ("Mirror Mirror", titleRect, juce::Justification::centred);
+    g.drawText ("MirrorMirror", titleRect, juce::Justification::centred);
     // Tab underline
     auto tabLine = getLocalBounds().reduced (12);
     tabLine.removeFromTop (36 + 28);
@@ -3049,7 +3049,7 @@ void AIMusicEditor::savePreset()
     auto dir = startDir.isNotEmpty() ? juce::File (startDir)
                                      : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
 
-    auto chooser = std::make_shared<juce::FileChooser> ("Save Mirror Mirror Preset", dir, "*.mmpreset");
+    auto chooser = std::make_shared<juce::FileChooser> ("Save MirrorMirror Preset", dir, "*.mmpreset");
     chooser->launchAsync (juce::FileBrowserComponent::saveMode |
                           juce::FileBrowserComponent::canSelectFiles,
         [this, chooser] (const juce::FileChooser& fc)
@@ -3085,7 +3085,7 @@ void AIMusicEditor::loadPreset()
     auto dir = startDir.isNotEmpty() ? juce::File (startDir)
                                      : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
 
-    auto chooser = std::make_shared<juce::FileChooser> ("Load Mirror Mirror Preset", dir, "*.mmpreset");
+    auto chooser = std::make_shared<juce::FileChooser> ("Load MirrorMirror Preset", dir, "*.mmpreset");
     chooser->launchAsync (juce::FileBrowserComponent::openMode |
                           juce::FileBrowserComponent::canSelectFiles,
         [this, chooser] (const juce::FileChooser& fc)
