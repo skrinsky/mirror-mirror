@@ -89,43 +89,47 @@ fi
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
+PLUGIN="MirrorMirror"
+
 if [[ "$OS" == "Darwin" ]]; then
     # Install VST3
-    VST3_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*VST3[^"]*"' | grep -o 'https://[^"]*' | head -1)"
+    VST3_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*vst3[^"]*"' | grep -oi 'https://[^"]*' | head -1)"
     if [[ -n "$VST3_URL" ]]; then
         info "Downloading VST3..."
         curl -fsSL "$VST3_URL" -o "$TMP_DIR/vst3.zip"
         unzip -qo "$TMP_DIR/vst3.zip" -d "$TMP_DIR/vst3"
         VST3_DEST="$HOME/Library/Audio/Plug-Ins/VST3"
         mkdir -p "$VST3_DEST"
-        rm -rf "$VST3_DEST/Mirror Mirror.vst3"
-        cp -r "$TMP_DIR/vst3/Mirror Mirror.vst3" "$VST3_DEST/"
+        rm -rf "$VST3_DEST/$PLUGIN.vst3"
+        cp -r "$TMP_DIR/vst3/$PLUGIN.vst3" "$VST3_DEST/"
+        xattr -cr "$VST3_DEST/$PLUGIN.vst3" 2>/dev/null || true
         ok "VST3 installed to $VST3_DEST"
     fi
 
     # Install AU
-    AU_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*AU[^"]*"' | grep -o 'https://[^"]*' | head -1)"
+    AU_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*au[^"]*"' | grep -oi 'https://[^"]*' | head -1)"
     if [[ -n "$AU_URL" ]]; then
         info "Downloading AU..."
         curl -fsSL "$AU_URL" -o "$TMP_DIR/au.zip"
         unzip -qo "$TMP_DIR/au.zip" -d "$TMP_DIR/au"
         AU_DEST="$HOME/Library/Audio/Plug-Ins/Components"
         mkdir -p "$AU_DEST"
-        rm -rf "$AU_DEST/Mirror Mirror.component"
-        cp -r "$TMP_DIR/au/Mirror Mirror.component" "$AU_DEST/"
+        rm -rf "$AU_DEST/$PLUGIN.component"
+        cp -r "$TMP_DIR/au/$PLUGIN.component" "$AU_DEST/"
+        xattr -cr "$AU_DEST/$PLUGIN.component" 2>/dev/null || true
         ok "AU installed to $AU_DEST"
     fi
 
 elif [[ "$OS" == "Linux" ]]; then
-    VST3_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*VST3[^"]*Linux[^"]*"' | grep -o 'https://[^"]*' | head -1)"
+    VST3_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*vst3[^"]*linux[^"]*"' | grep -oi 'https://[^"]*' | head -1)"
     if [[ -n "$VST3_URL" ]]; then
         info "Downloading VST3..."
         curl -fsSL "$VST3_URL" -o "$TMP_DIR/vst3.zip"
         unzip -qo "$TMP_DIR/vst3.zip" -d "$TMP_DIR/vst3"
         VST3_DEST="$HOME/.vst3"
         mkdir -p "$VST3_DEST"
-        rm -rf "$VST3_DEST/Mirror Mirror.vst3"
-        cp -r "$TMP_DIR/vst3/Mirror Mirror.vst3" "$VST3_DEST/"
+        rm -rf "$VST3_DEST/$PLUGIN.vst3"
+        cp -r "$TMP_DIR/vst3/$PLUGIN.vst3" "$VST3_DEST/"
         ok "VST3 installed to $VST3_DEST"
     fi
 fi
@@ -138,8 +142,8 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 if [[ "$OS" == "Darwin" ]]; then
     echo "  Plugin installed to:"
-    [[ -n "${VST3_URL:-}" ]] && echo "    ~/Library/Audio/Plug-Ins/VST3/Mirror Mirror.vst3"
-    [[ -n "${AU_URL:-}" ]]   && echo "    ~/Library/Audio/Plug-Ins/Components/Mirror Mirror.component"
+    [[ -n "${VST3_URL:-}" ]] && echo "    ~/Library/Audio/Plug-Ins/VST3/MirrorMirror.vst3"
+    [[ -n "${AU_URL:-}" ]]   && echo "    ~/Library/Audio/Plug-Ins/Components/MirrorMirror.component"
 fi
 echo ""
 echo "  Repo location: $INSTALL_DIR"

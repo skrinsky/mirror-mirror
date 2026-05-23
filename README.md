@@ -36,7 +36,7 @@ Download `MirrorMirror-vX.X.X.dmg` from the [Releases page](https://github.com/s
 Requires git and Python 3.10.
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.sh)
+curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.sh | bash
 ```
 
 **Windows** (PowerShell):
@@ -49,7 +49,7 @@ irm https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.ps1 | 
 Requires Xcode Command Line Tools and cmake. JUCE is fetched automatically by CMake on first build. See [Requirements](#requirements) below.
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install-dev.sh)
+curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install-dev.sh | bash
 ```
 
 ---
