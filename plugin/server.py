@@ -616,6 +616,30 @@ def generate(req: GenerateRequest):
             _set_status(stage="generating", message=f"job {job_id}",
                         error=None, epoch=None, val_loss=None)
 
+            # Resolve ckpt: if empty or missing, auto-discover from project then legacy path.
+            ckpt_resolved: Optional[Path] = None
+            if req.ckpt.strip():
+                p = Path(req.ckpt.strip()).resolve()
+                if p.exists():
+                    ckpt_resolved = p
+            if ckpt_resolved is None:
+                if req.project_name.strip():
+                    _slug = re.sub(r"[^\w-]", "_", req.project_name.strip()) or "default"
+                    _proj_ckpt = ROOT / "runs" / _slug / "checkpoints" / "model.pt"
+                    if _proj_ckpt.exists():
+                        ckpt_resolved = _proj_ckpt
+                        print(f"[generate] auto-discovered project checkpoint: {ckpt_resolved}")
+            if ckpt_resolved is None:
+                _legacy = ROOT / "runs" / "checkpoints" / "es_model.pt"
+                if _legacy.exists():
+                    ckpt_resolved = _legacy
+                    print(f"[generate] using legacy checkpoint: {ckpt_resolved}")
+            if ckpt_resolved is None:
+                _set_status(stage="error",
+                            error="No checkpoint found — train a model first, or use "
+                                  "'Select Model' in the plugin to choose a .pt file.")
+                return
+
             # Resolve vocab_json: use supplied path if it exists, otherwise
             # search every known event directory under ROOT.
             # Project-specific dir goes first (most likely match); then a glob
@@ -646,7 +670,7 @@ def generate(req: GenerateRequest):
                 # Find the vocab whose token count matches the checkpoint embedding size.
                 import torch, json as _json
                 try:
-                    _ckpt = torch.load(str(Path(req.ckpt).resolve()),
+                    _ckpt = torch.load(str(ckpt_resolved),
                                        map_location="cpu")
                     _state = _ckpt.get("model_state") or _ckpt.get("model_state_dict") or {}
                     _emb = _state.get("tok_emb.weight")
@@ -690,7 +714,7 @@ def generate(req: GenerateRequest):
             out_mid = out_dir / "generated.mid"
             cmd = [
                 PYTHON, str(ROOT / "training" / "generate_v2.py"),
-                "--ckpt",            str(Path(req.ckpt).resolve()),
+                "--ckpt",            str(ckpt_resolved),
                 "--vocab_json",      str(vocab_path),
                 "--out_midi",        str(out_mid),
                 "--temperature",     str(req.temperature),

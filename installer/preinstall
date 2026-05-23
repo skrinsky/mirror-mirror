@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Runs before the pkg payload is laid down.
+# Stops any running server and clears the previous install.
+set -euo pipefail
+
+SUPPORT="$HOME/Library/Application Support/MirrorMirror"
+PLIST="$HOME/Library/LaunchAgents/com.mirrormirror.server.plist"
+
+# Stop and unload the previous LaunchAgent if present
+if [[ -f "$PLIST" ]]; then
+    launchctl unload "$PLIST" 2>/dev/null || true
+fi
+
+# Remove previous server bundle (plugins are left in place — reinstalled by payload)
+rm -rf "$SUPPORT"
+
+exit 0

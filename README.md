@@ -19,28 +19,29 @@ Everything runs **locally** on your machine. The plugin talks to a small Python 
 
 ## Download & Install
 
-### Quick install (no Xcode / Visual Studio required)
+### macOS pkg installer (easiest)
 
-Downloads the pre-built plugin from GitHub Releases and sets up the Python environment. Just needs git and Python 3.10.
+Download `MirrorMirror-vX.X.X.dmg` from the [Releases page](https://github.com/skrinsky/mirror-mirror/releases).
 
-**macOS / Linux:**
+1. Double-click the dmg, then double-click the `.pkg` inside
+2. macOS will warn *"can't be verified"* — go to **System Settings → Privacy & Security → Open Anyway** (one-time)
+3. Click through the installer wizard
+4. The plugin installs itself and the server starts automatically at login
+5. Open your DAW and scan for new plugins — **MirrorMirror** will appear
+
+> **First launch:** the server downloads its Python dependencies (~500 MB) in the background after install. This takes a few minutes. Progress is logged to `~/Library/Application Support/MirrorMirror/install.log`.
+
+### Quick install via terminal (macOS / Linux)
+
+Requires git and Python 3.10.
+
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.sh)
-```
-
-Custom install location:
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.sh) --dir ~/my-mirror-mirror
 ```
 
 **Windows** (PowerShell):
 ```powershell
 irm https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.ps1 | iex
-```
-
-Custom install location:
-```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.ps1))) -InstallDir "C:\mirror-mirror"
 ```
 
 ### Build from source
@@ -50,8 +51,6 @@ Requires Xcode Command Line Tools and cmake. JUCE is fetched automatically by CM
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install-dev.sh)
 ```
-
-Pre-built VST3/AU zips are also available on the [Releases page](../../releases) if you want to install manually.
 
 ---
 
@@ -103,10 +102,10 @@ projects pinning the same JUCE tag reuse that cached clone. To override the
 cache location: `export CPM_SOURCE_CACHE=/your/path` before running cmake.
 
 This automatically installs:
-- `Mirror Mirror.component` -> `~/Library/Audio/Plug-Ins/Components/`
-- `Mirror Mirror.vst3` -> `~/Library/Audio/Plug-Ins/VST3/`
+- `MirrorMirror.component` -> `~/Library/Audio/Plug-Ins/Components/`
+- `MirrorMirror.vst3` -> `~/Library/Audio/Plug-Ins/VST3/`
 
-Then **rescan plugins in your DAW**. In Logic Pro: *Logic Pro -> Plug-in Manager -> Reset & Rescan*. Mirror Mirror will appear under AU and VST3i instrument categories.
+Then **rescan plugins in your DAW**. In Logic Pro: *Logic Pro -> Plug-in Manager -> Reset & Rescan*. MirrorMirror will appear under AU and VST3i instrument categories.
 
 ---
 
@@ -295,12 +294,15 @@ Fine-tuning works best when your new material is stylistically related to the ba
 Rescan plugins in your DAW. Logic Pro: *Logic Pro -> Plug-in Manager -> Reset & Rescan*.
 
 **Status stays "idle" / server not reachable**
-The plugin couldn't launch the server. Start it manually:
+The plugin couldn't launch the server. If you used the pkg installer, check the log:
+```bash
+cat ~/Library/Application\ Support/MirrorMirror/install.log
+```
+If deps are still installing, wait a minute and retry. To start the server manually:
 ```bash
 source .venv/bin/activate
-python plugin/server.py --root /path/to/ai-music-full-pipeline
+python plugin/server.py --root /path/to/mirror-mirror
 ```
-If it errors, make sure `make setup` completed successfully.
 
 **"No audio files found"**
 The chosen folder contained no supported audio. Check the path and file extensions.
@@ -311,10 +313,14 @@ Click **Process Audio** before **Train**. The plugin checks for `events_train.pk
 **Length knob turns orange**
 The Length value exceeds the model's training context. Generation still works but quality may drop past that point.
 
-**Old "AI Music" plugin still showing**
+**Old plugin versions still showing**
 ```bash
+# Remove old "AI Music" build
 rm -rf ~/Library/Audio/Plug-Ins/Components/"AI Music.component"
 rm -rf ~/Library/Audio/Plug-Ins/VST3/"AI Music.vst3"
+# Remove old "Mirror Mirror" build (pre-rename)
+rm -rf ~/Library/Audio/Plug-Ins/Components/"Mirror Mirror.component"
+rm -rf ~/Library/Audio/Plug-Ins/VST3/"Mirror Mirror.vst3"
 ```
 Then rescan.
 

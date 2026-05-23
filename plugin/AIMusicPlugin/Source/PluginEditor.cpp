@@ -2173,11 +2173,6 @@ AIMusicEditor::AIMusicEditor (AIMusicProcessor& p)
     addAndMakeVisible (btnSyncTempo);
 
     btnGenerate.onClick = [this] {
-        if (proc.ckptPath.isEmpty()) {
-            localErrorMessage = "No model loaded, use \"Select Model\" to choose a .pt checkpoint.";
-            updateStatusLabel();
-            return;
-        }
         localErrorMessage.clear();
         proc.startGenerate();
     };

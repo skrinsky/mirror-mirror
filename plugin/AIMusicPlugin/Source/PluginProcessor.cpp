@@ -206,6 +206,14 @@ void AIMusicProcessor::discoverRepoRoot()
         }
     }
 
+    // pkg installer puts the server here
+    {
+        auto appSupport = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                              .getChildFile ("MirrorMirror");
+        if (appSupport.getChildFile ("plugin/server.py").existsAsFile())
+        { repoRoot = appSupport; return; }
+    }
+
     auto pluginDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
                          .getParentDirectory();
     auto found = findRepoRoot (pluginDir);
@@ -575,7 +583,7 @@ void AIMusicProcessor::timerCallback()
     {
         // Relaunch at most once every 15 s — gives detached server time to start up
         auto nowMs = juce::Time::currentTimeMillis();
-        if (nowMs - lastServerLaunchMs > 15000)
+        if (nowMs - lastServerLaunchMs > 5000)
             launchServer();
     }
 

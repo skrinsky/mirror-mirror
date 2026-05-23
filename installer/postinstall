@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# Runs after the pkg payload is installed.
+# Sets up the Python environment and installs the LaunchAgent.
+set -euo pipefail
+
+SUPPORT="$HOME/Library/Application Support/MirrorMirror"
+VENV="$SUPPORT/.venv"
+LOG="$SUPPORT/install.log"
+PLIST="$HOME/Library/LaunchAgents/com.mirrormirror.server.plist"
+
+mkdir -p "$SUPPORT"
+
+# 1. Clear Gatekeeper quarantine on both plugin formats
+xattr -cr "$HOME/Library/Audio/Plug-Ins/VST3/MirrorMirror.vst3"          2>/dev/null || true
+xattr -cr "$HOME/Library/Audio/Plug-Ins/Components/MirrorMirror.component" 2>/dev/null || true
+
+# 2. Install uv if not already present
+if ! command -v uv &>/dev/null; then
+    echo "[postinstall] installing uv..." | tee -a "$LOG"
+    curl -LsSf https://astral.sh/uv/install.sh | sh >> "$LOG" 2>&1
+    # Add uv to PATH for the rest of this script
+    export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+fi
+
+# 3. Create venv + install deps in the background (torch is large — takes a few minutes)
+#    Progress is written to ~/Library/Application Support/MirrorMirror/install.log
+cat > "$SUPPORT/setup_deps.sh" <<'SETUP'
+#!/usr/bin/env bash
+set -euo pipefail
+SUPPORT="$HOME/Library/Application Support/MirrorMirror"
+VENV="$SUPPORT/.venv"
+LOG="$SUPPORT/install.log"
+export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+
+echo "[deps] creating venv..." | tee -a "$LOG"
+uv venv --python 3.10 "$VENV" >> "$LOG" 2>&1
+
+echo "[deps] installing dependencies (this takes a few minutes)..." | tee -a "$LOG"
+"$VENV/bin/pip" install --upgrade pip >> "$LOG" 2>&1
+uv pip install --python "$VENV/bin/python" \
+    fastapi uvicorn[standard] \
+    torch torchaudio \
+    pretty_midi scipy numpy mido \
+    music21 \
+    >> "$LOG" 2>&1
+
+echo "[deps] done" | tee -a "$LOG"
+SETUP
+chmod +x "$SUPPORT/setup_deps.sh"
+
+nohup "$SUPPORT/setup_deps.sh" >> "$LOG" 2>&1 &
+
+# 4. Write and load the LaunchAgent
+#    KeepAlive=true so it restarts if it crashes; starts at login.
+mkdir -p "$HOME/Library/LaunchAgents"
+
+# Resolve the venv python path (may not exist yet while deps install in background,
+# but launchctl will retry on next login once setup_deps.sh finishes)
+VENV_PYTHON="$VENV/bin/python"
+
+cat > "$PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.mirrormirror.server</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${VENV_PYTHON}</string>
+        <string>${SUPPORT}/plugin/server.py</string>
+        <string>--root</string>
+        <string>${SUPPORT}</string>
+    </array>
+    <key>RunAtLoad</key>   <true/>
+    <key>KeepAlive</key>   <true/>
+    <key>StandardOutPath</key>  <string>${SUPPORT}/server.log</string>
+    <key>StandardErrorPath</key><string>${SUPPORT}/server.log</string>
+</dict>
+</plist>
+PLIST
+
+launchctl load "$PLIST" 2>/dev/null || true
+
+echo "[postinstall] complete. Dep install running in background — check $LOG for progress." | tee -a "$LOG"
+exit 0

@@ -33,7 +33,7 @@ juce_add_plugin(AIMusicPlugin
     PLUGIN_MANUFACTURER_CODE Smkr
     PLUGIN_CODE             Aimp
     FORMATS                 ${PLUGIN_FORMATS}
-    PRODUCT_NAME            "Mirror Mirror"
+    PRODUCT_NAME            "MirrorMirror"
     IS_SYNTH                TRUE
     NEEDS_MIDI_INPUT        FALSE
     NEEDS_MIDI_OUTPUT       TRUE
@@ -83,19 +83,19 @@ else()  # Linux
     set(USER_VST3_DIR "$ENV{HOME}/.vst3")
 endif()
 
-set(BUILD_VST3 "${CMAKE_CURRENT_BINARY_DIR}/AIMusicPlugin_artefacts/$<CONFIG>/VST3/Mirror Mirror.vst3")
+set(BUILD_VST3 "${CMAKE_CURRENT_BINARY_DIR}/AIMusicPlugin_artefacts/$<CONFIG>/VST3/MirrorMirror.vst3")
 
 add_custom_command(TARGET AIMusicPlugin_VST3 POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E remove_directory "${USER_VST3_DIR}/Mirror Mirror.vst3"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${BUILD_VST3}" "${USER_VST3_DIR}/Mirror Mirror.vst3"
+    COMMAND ${CMAKE_COMMAND} -E remove_directory "${USER_VST3_DIR}/MirrorMirror.vst3"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${BUILD_VST3}" "${USER_VST3_DIR}/MirrorMirror.vst3"
     COMMENT "Installing VST3 to ${USER_VST3_DIR}"
     VERBATIM
 )
 
 # AU: macOS only — patch Info.plist, re-sign, install to user Library
 if(APPLE)
-    set(BUILD_COMPONENT "${CMAKE_CURRENT_BINARY_DIR}/AIMusicPlugin_artefacts/$<CONFIG>/AU/Mirror Mirror.component")
-    set(USER_COMPONENT_DIR "$ENV{HOME}/Library/Audio/Plug-Ins/Components/Mirror Mirror.component")
+    set(BUILD_COMPONENT "${CMAKE_CURRENT_BINARY_DIR}/AIMusicPlugin_artefacts/$<CONFIG>/AU/MirrorMirror.component")
+    set(USER_COMPONENT_DIR "$ENV{HOME}/Library/Audio/Plug-Ins/Components/MirrorMirror.component")
 
     add_custom_command(TARGET AIMusicPlugin_AU POST_BUILD
         COMMAND python3 -c
