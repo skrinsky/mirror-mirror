@@ -19,17 +19,29 @@ Everything runs **locally** on your machine. The plugin talks to a small Python 
 
 ## Download & Install
 
-### macOS pkg installer (easiest)
+### macOS — download the pre-built plugin (no Xcode required)
 
-Download `MirrorMirror-vX.X.X.dmg` from the [Releases page](https://github.com/skrinsky/mirror-mirror/releases).
+1. Go to the [Releases page](https://github.com/skrinsky/mirror-mirror/releases) and download `MirrorMirror-mac-vst3.zip` (and `MirrorMirror-mac-au.zip` if you want AU)
+2. Unzip the file — you'll get a `MirrorMirror.vst3` folder
+3. Open Finder, press **Cmd + Shift + G**, paste `~/Library/Audio/Plug-Ins/VST3/` and hit Go
+4. Drag `MirrorMirror.vst3` into that folder
+5. Open Terminal (search Spotlight for "Terminal") and run:
+```bash
+xattr -cr ~/Library/Audio/Plug-Ins/VST3/MirrorMirror.vst3
+```
+This removes the macOS security flag that would otherwise block the plugin from loading.
 
-1. Double-click the dmg, then double-click the `.pkg` inside
-2. macOS will warn *"can't be verified"* — go to **System Settings → Privacy & Security → Open Anyway** (one-time)
-3. Click through the installer wizard
-4. The plugin installs itself and the server starts automatically at login
-5. Open your DAW and scan for new plugins — **MirrorMirror** will appear
+6. Rescan plugins in your DAW — **MirrorMirror** will appear
 
-> **First launch:** the server downloads its Python dependencies (~500 MB) in the background after install. This takes a few minutes. Progress is logged to `~/Library/Application Support/MirrorMirror/install.log`.
+> A one-click `.dmg` installer (no Terminal needed) is coming soon.
+
+#### Setting up the server
+
+The plugin also needs the Python server running. Download and install it with:
+```bash
+curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.sh | bash
+```
+This sets up the server without building anything — no Xcode or JUCE required. After it finishes, the server will start automatically whenever you open your DAW.
 
 ### Quick install via terminal (macOS / Linux)
 
