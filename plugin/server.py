@@ -640,6 +640,11 @@ def generate(req: GenerateRequest):
                                   "'Select Model' in the plugin to choose a .pt file.")
                 return
 
+            # If we auto-discovered the checkpoint (user left the field blank),
+            # report the resolved path back so the plugin can fill in the UI.
+            if not req.ckpt.strip():
+                _set_status(ckpt_path=str(ckpt_resolved))
+
             # Resolve vocab_json: use supplied path if it exists, otherwise
             # search every known event directory under ROOT.
             # Project-specific dir goes first (most likely match); then a glob

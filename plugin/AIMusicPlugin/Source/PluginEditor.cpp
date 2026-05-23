@@ -2799,6 +2799,14 @@ void AIMusicEditor::timerCallback()
     if (kRunning.contains (curStage) && ! kRunning.contains (prevStage))
         mm.triggerNod();
 
+    // If the server auto-discovered a checkpoint (user left the field blank),
+    // fill in the path so the user can see what's being used.
+    if (proc.ckptPath.isEmpty() && proc.lastStatus.ckptPath.isNotEmpty())
+    {
+        proc.ckptPath = proc.lastStatus.ckptPath;
+        lblCkpt.setText (proc.ckptPath, juce::dontSendNotification);
+    }
+
     // Celebration burst + wink when a job finishes
     if (curStage == "done" && kRunning.contains (prevStage))
     {
