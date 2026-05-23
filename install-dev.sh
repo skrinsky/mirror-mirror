@@ -143,8 +143,8 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 if [[ "$PLATFORM" == "macos" ]]; then
     echo "  Plugin installed to:"
-    echo "    ~/Library/Audio/Plug-Ins/VST3/Mirror Mirror.vst3"
-    echo "    ~/Library/Audio/Plug-Ins/Components/Mirror Mirror.component"
+    echo "    ~/Library/Audio/Plug-Ins/VST3/MirrorMirror.vst3"
+    echo "    ~/Library/Audio/Plug-Ins/Components/MirrorMirror.component"
 fi
 echo ""
 echo "  Repo location: $INSTALL_DIR"
