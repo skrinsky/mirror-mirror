@@ -21,7 +21,7 @@ Everything runs **locally** on your machine. The plugin talks to a small Python 
 
 ### For musicians (no coding required)
 
-Requires git and Python 3.10–3.12 (or none — the installer will download Python automatically). One command installs everything — the plugin and the server:
+Requires git and Python 3.10+ (or none — the installer will download Python automatically). One command installs everything — the plugin and the server:
 
 **macOS / Linux:**
 ```bash
@@ -52,7 +52,7 @@ curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install
 | | |
 |---|---|
 | macOS 10.13+ | required for AU format; VST3 also builds on Windows/Linux |
-| Python 3.10–3.12 | managed by the repo's `uv` venv (downloaded automatically if absent) |
+| Python 3.10+ | managed by the repo's `uv` venv (downloaded automatically if absent) |
 | CMake 3.22+ | `brew install cmake` |
 | Xcode Command Line Tools | `xcode-select --install` (macOS only) |
 | JUCE 8.0.3 | fetched automatically by CMake (via CPM) into `~/.cache/CPM` on first build |
