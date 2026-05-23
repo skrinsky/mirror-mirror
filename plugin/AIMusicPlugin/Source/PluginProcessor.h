@@ -99,7 +99,8 @@ public:
 
 private:
     PipelineClient client;
-    juce::int64 lastServerLaunchMs { 0 };   // cooldown — don't re-launch within 15 s
+    juce::int64 lastServerLaunchMs { 0 };   // cooldown — don't re-launch within 5 s
+    int serverPid { 0 };                    // PID of the launched server process (0 = unknown)
     juce::ApplicationProperties appProperties;
 
 #if JUCE_MAC

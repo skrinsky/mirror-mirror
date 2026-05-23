@@ -128,7 +128,15 @@ AIMusicProcessor::~AIMusicProcessor()
     previewTransport.stop();
     previewTransport.setSource (nullptr);
 #endif
-    // Server is intentionally left running so jobs survive DAW close.
+    // Kill the server unless training is in progress (training should survive DAW close).
+    if (lastStatus.stage != "training" && serverPid > 0)
+    {
+       #if JUCE_WINDOWS
+        juce::ChildProcess::killProcess (serverPid, true);
+       #else
+        ::kill (serverPid, SIGTERM);
+       #endif
+    }
 }
 
 juce::File AIMusicProcessor::findRepoRoot (const juce::File& startDir)
@@ -152,22 +160,27 @@ void AIMusicProcessor::tryLaunchServerFromRepoRoot (const juce::File& repoRoot)
 
     auto q = [] (const juce::String& s) { return "\"" + s + "\""; };
 
+    juce::String pidFile = juce::File::getSpecialLocation (
+        juce::File::tempDirectory).getChildFile ("mirrormirror_server.pid").getFullPathName();
+
     auto activate = repoRoot.getChildFile (".venv/bin/activate");
     juce::String shellCmd;
     if (activate.existsAsFile())
         shellCmd = ". " + q (activate.getFullPathName())
-                 + " && nohup python " + q (serverScript.getFullPathName())
+                 + " && python " + q (serverScript.getFullPathName())
                  + " --root " + q (repoRoot.getFullPathName())
-                 + " > /dev/null 2>&1 &";
+                 + " > /dev/null 2>&1 & echo $! > " + q (pidFile);
     else
-        shellCmd = "nohup python3 " + q (serverScript.getFullPathName())
+        shellCmd = "python3 " + q (serverScript.getFullPathName())
                  + " --root " + q (repoRoot.getFullPathName())
-                 + " > /dev/null 2>&1 &";
+                 + " > /dev/null 2>&1 & echo $! > " + q (pidFile);
 
-    // Shell exits immediately after forking the server; server survives DAW close.
     juce::ChildProcess shell;
     shell.start ({ "/bin/bash", "-c", shellCmd });
     shell.waitForProcessToFinish (3000);
+
+    // Read back the PID so we can kill the server when the plugin unloads.
+    serverPid = juce::File (pidFile).loadFileAsString().trim().getIntValue();
 }
 
 juce::PropertiesFile* AIMusicProcessor::getPrefs()
