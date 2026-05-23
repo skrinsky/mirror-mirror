@@ -19,34 +19,11 @@ Everything runs **locally** on your machine. The plugin talks to a small Python 
 
 ## Download & Install
 
-### macOS — download the pre-built plugin (no Xcode required)
+### For musicians (no coding required)
 
-1. Go to the [Releases page](https://github.com/skrinsky/mirror-mirror/releases) and download `MirrorMirror-mac-vst3.zip` (and `MirrorMirror-mac-au.zip` if you want AU)
-2. Unzip the file — you'll get a `MirrorMirror.vst3` folder
-3. Open Finder, press **Cmd + Shift + G**, paste `~/Library/Audio/Plug-Ins/VST3/` and hit Go
-4. Drag `MirrorMirror.vst3` into that folder
-5. Open Terminal (search Spotlight for "Terminal") and run:
-```bash
-xattr -cr ~/Library/Audio/Plug-Ins/VST3/MirrorMirror.vst3
-```
-This removes the macOS security flag that would otherwise block the plugin from loading.
+Requires git and Python 3.10. One command installs everything — the plugin and the server:
 
-6. Rescan plugins in your DAW — **MirrorMirror** will appear
-
-> A one-click `.dmg` installer (no Terminal needed) is coming soon.
-
-#### Setting up the server
-
-The plugin also needs the Python server running. Download and install it with:
-```bash
-curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.sh | bash
-```
-This sets up the server without building anything — no Xcode or JUCE required. After it finishes, the server will start automatically whenever you open your DAW.
-
-### Quick install via terminal (macOS / Linux)
-
-Requires git and Python 3.10.
-
+**macOS / Linux:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.sh | bash
 ```
@@ -56,7 +33,13 @@ curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install
 irm https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.ps1 | iex
 ```
 
-### Build from source
+This downloads the pre-built plugin from the [Releases page](https://github.com/skrinsky/mirror-mirror/releases), installs it to the right place, sets up the Python server, and wires everything up so the server starts automatically when you open your DAW. No Xcode or JUCE required.
+
+After it finishes, rescan plugins in your DAW — **MirrorMirror** will appear.
+
+> A one-click `.dmg` installer (no Terminal needed) is coming soon.
+
+### For developers (build from source)
 
 Requires Xcode Command Line Tools and cmake. JUCE is fetched automatically by CMake on first build. See [Requirements](#requirements) below.
 
