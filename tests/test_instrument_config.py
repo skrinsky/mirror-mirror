@@ -51,10 +51,10 @@ class TestInstrumentPresets:
         assert config.voice_ranges["soprano"] == (57, 84)
         assert config.voice_ranges["bassvox"] == (33, 69)
 
-    def test_chorale4_augmentation_smaller_range(self):
+    def test_chorale4_no_pitch_augmentation(self):
+        # Chorale keys are normalized at conversion time, so no aug transposition.
         config = make_instrument_config(INSTRUMENT_PRESETS["chorale4"])
-        assert max(config.aug_transposes) <= 3
-        assert min(config.aug_transposes) >= -3
+        assert config.aug_transposes == []
 
     def test_chorale4_no_velocity_augmentation(self):
         config = make_instrument_config(INSTRUMENT_PRESETS["chorale4"])
