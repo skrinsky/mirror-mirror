@@ -73,7 +73,7 @@ $nvidiaSmiPath = $null
 foreach ($p in @("nvidia-smi", "C:\Windows\System32\nvidia-smi.exe",
                  "C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe")) {
     try {
-        $out = & $p 2>$null
+        $out = (& $p 2>$null) -join "`n"
         if ($out -match "CUDA Version") { $nvidiaSmiPath = $p; $nvidiaSmiOut = $out; break }
     } catch {}
 }
