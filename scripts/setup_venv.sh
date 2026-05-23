@@ -4,7 +4,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${ROOT_DIR}/.venv"
 VENV_PY="${VENV_DIR}/bin/python"
-PYTHON_BIN="${PYTHON_BIN:-python3.10}"   # override if needed: PYTHON_BIN=/opt/homebrew/bin/python3.10
+# Use system Python 3.10+ if available; otherwise let uv download one.
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [[ -z "$PYTHON_BIN" ]]; then
+    for candidate in python3 python; do
+        if command -v "$candidate" &>/dev/null; then
+            minor=$("$candidate" -c 'import sys; print(sys.version_info.minor)' 2>/dev/null)
+            major=$("$candidate" -c 'import sys; print(sys.version_info.major)' 2>/dev/null)
+            if [[ "$major" == "3" && "$minor" -ge 10 ]]; then
+                PYTHON_BIN="$candidate"; break
+            fi
+        fi
+    done
+fi
+PYTHON_BIN="${PYTHON_BIN:-3.10}"   # fall back to uv managed Python 3.10
 
 PIPE_DIR="${ROOT_DIR}/vendor/all-in-one-ai-midi-pipeline"
 

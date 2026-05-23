@@ -38,26 +38,33 @@ echo ""
 command -v git &>/dev/null || die "git is required. On macOS: install from https://git-scm.com or run 'xcode-select --install'"
 ok "git $(git --version | awk '{print $3}')"
 
-# ── Python 3.10 ───────────────────────────────────────────────────────────────
+# ── uv (manages Python + venv) ────────────────────────────────────────────────
+if ! command -v uv &>/dev/null; then
+    info "Installing uv (Python environment manager)..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+fi
+command -v uv &>/dev/null || die "uv installation failed — install it manually: https://docs.astral.sh/uv/"
+ok "uv $(uv --version)"
+
+# ── Python (via uv — uses system Python 3.10+ or downloads one) ───────────────
 PYTHON_BIN=""
-for candidate in python3.10 python3 python; do
+for candidate in python3 python; do
     if command -v "$candidate" &>/dev/null; then
-        ver="$("$candidate" -c 'import sys; print(sys.version_info[:2])')"
-        if [[ "$ver" == "(3, 10)" ]]; then
+        major=$("$candidate" -c 'import sys; print(sys.version_info.major)' 2>/dev/null)
+        minor=$("$candidate" -c 'import sys; print(sys.version_info.minor)' 2>/dev/null)
+        if [[ "$major" == "3" && "$minor" -ge 10 ]]; then
             PYTHON_BIN="$candidate"
             break
         fi
     fi
 done
-
-if [[ -z "$PYTHON_BIN" ]]; then
-    echo ""
-    echo "  Python 3.10 is required but was not found."
-    echo "  Download and install it from: https://www.python.org/downloads/"
-    echo "  Then re-run this installer."
-    exit 1
+# If no suitable Python found, uv will download one when creating the venv.
+if [[ -n "$PYTHON_BIN" ]]; then
+    ok "Python $($PYTHON_BIN --version)"
+else
+    info "No system Python 3.10+ found — uv will download one automatically"
 fi
-ok "Python $($PYTHON_BIN --version)"
 
 # ── Clone repo ────────────────────────────────────────────────────────────────
 if [[ -d "$INSTALL_DIR/.git" ]]; then
