@@ -29,24 +29,20 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 }
 Write-Ok "git $(git --version)"
 
-# ── Python 3.10 ───────────────────────────────────────────────────────────────
+# ── Python 3.10+ (or uv will manage it) ───────────────────────────────────────
 $PythonBin = $null
-foreach ($candidate in @("python3.10", "python3", "python")) {
+foreach ($candidate in @("python3", "python")) {
     try {
-        $ver = & $candidate -c "import sys; print(sys.version_info[:2])" 2>$null
-        if ($ver -eq "(3, 10)") { $PythonBin = $candidate; break }
+        $major = & $candidate -c "import sys; print(sys.version_info.major)" 2>$null
+        $minor = & $candidate -c "import sys; print(sys.version_info.minor)" 2>$null
+        if ($major -eq "3" -and [int]$minor -ge 10) { $PythonBin = $candidate; break }
     } catch {}
 }
-
-if (-not $PythonBin) {
-    Write-Host ""
-    Write-Host "  Python 3.10 is required but was not found." -ForegroundColor Yellow
-    Write-Host "  Download and install it from: https://www.python.org/downloads/"
-    Write-Host "  Make sure to check 'Add Python to PATH' during installation."
-    Write-Host "  Then re-run this installer."
-    exit 1
+if ($PythonBin) {
+    Write-Ok "Python $(& $PythonBin --version)"
+} else {
+    Write-Host "  No system Python 3.10+ found -- uv will download one automatically." -ForegroundColor Yellow
 }
-Write-Ok "Python $(& $PythonBin --version)"
 
 # ── Clone repo ────────────────────────────────────────────────────────────────
 if (Test-Path "$InstallDir\.git") {
