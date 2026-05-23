@@ -581,7 +581,7 @@ void AIMusicProcessor::timerCallback()
 {
     if (! client.isServerReachable())
     {
-        // Relaunch at most once every 15 s — gives detached server time to start up
+        // Relaunch at most once every 5 s — gives detached server time to start up
         auto nowMs = juce::Time::currentTimeMillis();
         if (nowMs - lastServerLaunchMs > 5000)
             launchServer();

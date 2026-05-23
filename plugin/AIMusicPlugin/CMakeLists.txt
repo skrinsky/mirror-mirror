@@ -13,13 +13,16 @@ if(NOT DEFINED ENV{CPM_SOURCE_CACHE})
     endif()
 endif()
 
-include(${CMAKE_CURRENT_LIST_DIR}/cmake/CPM.cmake)
-
-CPMAddPackage(
-    NAME JUCE
-    GITHUB_REPOSITORY juce-framework/JUCE
-    GIT_TAG 8.0.3
-)
+if(EXISTS "$ENV{HOME}/JUCE/CMakeLists.txt")
+    add_subdirectory("$ENV{HOME}/JUCE" "${CMAKE_CURRENT_BINARY_DIR}/JUCE")
+else()
+    include(${CMAKE_CURRENT_LIST_DIR}/cmake/CPM.cmake)
+    CPMAddPackage(
+        NAME JUCE
+        GITHUB_REPOSITORY juce-framework/JUCE
+        GIT_TAG 8.0.3
+    )
+endif()
 
 # AU is macOS-only; VST3 is cross-platform
 if(APPLE)
