@@ -29,20 +29,16 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 }
 Write-Ok "git $(git --version)"
 
-# ── Python 3.10+ (or uv will manage it) ───────────────────────────────────────
-$PythonBin = $null
-foreach ($candidate in @("python3", "python")) {
-    try {
-        $major = & $candidate -c "import sys; print(sys.version_info.major)" 2>$null
-        $minor = & $candidate -c "import sys; print(sys.version_info.minor)" 2>$null
-        if ($major -eq "3" -and [int]$minor -ge 10) { $PythonBin = $candidate; break }
-    } catch {}
+# ── uv (Python environment manager) ──────────────────────────────────────────
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    Write-Info "Installing uv (Python environment manager)..."
+    Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
+    $env:PATH = "$env:USERPROFILE\.local\bin;$env:USERPROFILE\.cargo\bin;$env:PATH"
 }
-if ($PythonBin) {
-    Write-Ok "Python $(& $PythonBin --version)"
-} else {
-    Write-Host "  No system Python 3.10+ found -- uv will download one automatically." -ForegroundColor Yellow
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    Write-Fail "uv install failed. Please install manually: https://docs.astral.sh/uv/getting-started/installation/"
 }
+Write-Ok "uv $(uv --version)"
 
 # ── Clone repo ────────────────────────────────────────────────────────────────
 if (Test-Path "$InstallDir\.git") {
@@ -55,49 +51,58 @@ if (Test-Path "$InstallDir\.git") {
 }
 Write-Ok "Repo at $InstallDir"
 
-# ── Python environment ────────────────────────────────────────────────────────
+# ── Python environment (always Python 3.10 via uv) ───────────────────────────
+# Python 3.12+ broke pkg_resources (used by vendor deps). Pin to 3.10 regardless
+# of what Python is installed on the system.
 Write-Info "Setting up Python environment (this may take a few minutes)..."
 $VenvDir = "$InstallDir\.venv"
 
 if (-not (Test-Path $VenvDir)) {
-    & $PythonBin -m venv $VenvDir
+    uv venv --python 3.10 $VenvDir
 }
 
 $PythonVenv = "$VenvDir\Scripts\python.exe"
-$PipVenv    = "$VenvDir\Scripts\pip.exe"
+$UvPip = "uv pip install --python $PythonVenv"
 
-& $PipVenv install -U pip setuptools wheel | Out-Null
+Invoke-Expression "$UvPip -U setuptools<81 pip wheel" | Out-Null
 
-# Detect CUDA for PyTorch
+# Detect CUDA for PyTorch — check PATH and common install locations
 Write-Info "Detecting platform for PyTorch..."
 $TorchCmd = $null
-try {
-    $nvidiaSmi = & nvidia-smi 2>$null
-    if ($nvidiaSmi -match "CUDA Version: (\d+)\.(\d+)") {
+$nvidiaSmiPath = $null
+foreach ($p in @("nvidia-smi", "C:\Windows\System32\nvidia-smi.exe",
+                 "C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe")) {
+    try {
+        $out = & $p 2>$null
+        if ($out -match "CUDA Version") { $nvidiaSmiPath = $p; $nvidiaSmiOut = $out; break }
+    } catch {}
+}
+if ($nvidiaSmiPath) {
+    if ($nvidiaSmiOut -match "CUDA Version: (\d+)\.(\d+)") {
         $cudaMajor = [int]$Matches[1]; $cudaMinor = [int]$Matches[2]
         if ($cudaMajor -ge 12 -and $cudaMinor -ge 4) { $idx = "cu124" }
         elseif ($cudaMajor -ge 12)                   { $idx = "cu121" }
         else                                          { $idx = "cu118" }
         Write-Host "  NVIDIA CUDA $cudaMajor.$cudaMinor detected -> PyTorch $idx"
-        $TorchCmd = "$PipVenv install torch torchaudio --index-url https://download.pytorch.org/whl/$idx"
+        $TorchCmd = "$UvPip torch torchaudio --index-url https://download.pytorch.org/whl/$idx"
     }
-} catch {}
+}
 
 if (-not $TorchCmd) {
     Write-Host "  No NVIDIA GPU detected -> PyTorch CPU build"
-    $TorchCmd = "$PipVenv install torch torchaudio --index-url https://download.pytorch.org/whl/cpu"
+    $TorchCmd = "$UvPip torch torchaudio --index-url https://download.pytorch.org/whl/cpu"
 }
 Invoke-Expression $TorchCmd | Out-Null
 
 # Install requirements
 $ReqFile = "$InstallDir\requirements.txt"
-if (Test-Path $ReqFile) { & $PipVenv install -r $ReqFile | Out-Null }
+if (Test-Path $ReqFile) { Invoke-Expression "$UvPip -r $ReqFile" | Out-Null }
 
 $VendorReq = "$InstallDir\vendor\all-in-one-ai-midi-pipeline\requirements.txt"
 if (Test-Path $VendorReq) {
     $tmp = [System.IO.Path]::GetTempFileName() + ".txt"
-    Get-Content $VendorReq | Where-Object { $_ -notmatch "^torch([=<>!~ ]|$)" } | Set-Content $tmp
-    & $PipVenv install -r $tmp | Out-Null
+    Get-Content $VendorReq | Where-Object { $_ -notmatch "^(torch|torchaudio|torchvision)([=<>!~ ]|$)" } | Set-Content $tmp
+    Invoke-Expression "$UvPip -r $tmp" | Out-Null
     Remove-Item $tmp
 }
 Write-Ok "Python environment ready"
