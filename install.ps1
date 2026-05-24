@@ -78,8 +78,10 @@ foreach ($p in @("nvidia-smi", "C:\Windows\System32\nvidia-smi.exe",
     } catch {}
 }
 if ($nvidiaSmiPath) {
-    if ($nvidiaSmiOut -match "CUDA Version: (\d+)\.(\d+)") {
-        $cudaMajor = [int]$Matches[1]; $cudaMinor = [int]$Matches[2]
+    $cudaMatch = [regex]::Match($nvidiaSmiOut, "CUDA Version:\s*(\d+)\.(\d+)")
+    if ($cudaMatch.Success) {
+        $cudaMajor = [int]$cudaMatch.Groups[1].Value
+        $cudaMinor = [int]$cudaMatch.Groups[2].Value
         if ($cudaMajor -ge 12 -and $cudaMinor -ge 4) { $idx = "cu124" }
         elseif ($cudaMajor -ge 12)                   { $idx = "cu121" }
         else                                          { $idx = "cu118" }
