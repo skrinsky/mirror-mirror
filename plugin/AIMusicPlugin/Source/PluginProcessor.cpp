@@ -132,7 +132,8 @@ AIMusicProcessor::~AIMusicProcessor()
     if (lastStatus.stage != "training" && serverPid > 0)
     {
        #if JUCE_WINDOWS
-        juce::ChildProcess::killProcess (serverPid, true);
+        if (HANDLE h = ::OpenProcess (PROCESS_TERMINATE, FALSE, (DWORD) serverPid))
+            { ::TerminateProcess (h, 0); ::CloseHandle (h); }
        #else
         ::kill (serverPid, SIGTERM);
        #endif
