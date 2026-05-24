@@ -1,0 +1,79 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # required to upload release assets
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache CPM (JUCE 8.0.3)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/CPM
+          key: cpm-juce-8.0.3-macos
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        working-directory: plugin/AIMusicPlugin
+
+      - name: Build
+        run: cmake --build build --config Release
+        working-directory: plugin/AIMusicPlugin
+
+      - name: Package VST3
+        run: |
+          cd plugin/AIMusicPlugin/build/AIMusicPlugin_artefacts/Release/VST3
+          zip -r "$GITHUB_WORKSPACE/MirrorMirror-mac-vst3.zip" MirrorMirror.vst3
+
+      - name: Package AU
+        run: |
+          cd plugin/AIMusicPlugin/build/AIMusicPlugin_artefacts/Release/AU
+          zip -r "$GITHUB_WORKSPACE/MirrorMirror-mac-au.zip" MirrorMirror.component
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            MirrorMirror-mac-vst3.zip
+            MirrorMirror-mac-au.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache CPM (JUCE 8.0.3)
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.LOCALAPPDATA }}\CPM
+          key: cpm-juce-8.0.3-windows
+
+      - name: Configure
+        run: cmake -B build
+        working-directory: plugin/AIMusicPlugin
+
+      - name: Build
+        run: cmake --build build --config Release
+        working-directory: plugin/AIMusicPlugin
+
+      - name: Package VST3
+        run: |
+          Compress-Archive -Path "plugin\AIMusicPlugin\build\AIMusicPlugin_artefacts\Release\VST3\MirrorMirror.vst3" `
+                           -DestinationPath "MirrorMirror-windows-vst3.zip"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: MirrorMirror-windows-vst3.zip
