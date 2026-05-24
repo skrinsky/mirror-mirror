@@ -3,6 +3,11 @@ project(AIMusicPlugin VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# Static MSVC runtime so the VST3 is self-contained (no VC++ redist needed)
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 # Shared CPM cache across all projects that pin the same JUCE tag.
 # Override by exporting CPM_SOURCE_CACHE before invoking cmake.
 if(NOT DEFINED ENV{CPM_SOURCE_CACHE})
