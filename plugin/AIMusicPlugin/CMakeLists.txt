@@ -69,7 +69,7 @@ target_compile_definitions(AIMusicPlugin PRIVATE
 
 target_link_libraries(AIMusicPlugin PRIVATE
     juce::juce_audio_utils
-    juce::juce_audio_basics
+    juce::juce_audio_devices
     juce::juce_audio_formats
     juce::juce_gui_basics
     juce::juce_audio_processors
