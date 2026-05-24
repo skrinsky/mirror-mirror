@@ -158,6 +158,19 @@ void AIMusicProcessor::tryLaunchServerFromRepoRoot (const juce::File& repoRoot)
     auto serverScript = repoRoot.getChildFile ("plugin/server.py");
     if (! serverScript.existsAsFile()) return;
 
+#if JUCE_WINDOWS
+    // On Windows: run the venv Python directly — no bash, no blocking wait.
+    // The venv Python already knows its own site-packages so no activation needed.
+    auto pythonVenv = repoRoot.getChildFile (".venv\\Scripts\\python.exe");
+    auto pythonBin  = pythonVenv.existsAsFile() ? pythonVenv.getFullPathName()
+                                                 : juce::String ("python");
+    juce::ChildProcess proc;
+    if (proc.start ({ pythonBin,
+                      serverScript.getFullPathName(),
+                      "--root", repoRoot.getFullPathName() }))
+        serverPid = (int) proc.getPID();
+    // proc goes out of scope; child process keeps running on Windows.
+#else
     auto q = [] (const juce::String& s) { return "\"" + s + "\""; };
 
     juce::String pidFile = juce::File::getSpecialLocation (
@@ -181,6 +194,7 @@ void AIMusicProcessor::tryLaunchServerFromRepoRoot (const juce::File& repoRoot)
 
     // Read back the PID so we can kill the server when the plugin unloads.
     serverPid = juce::File (pidFile).loadFileAsString().trim().getIntValue();
+#endif
 }
 
 juce::PropertiesFile* AIMusicProcessor::getPrefs()
