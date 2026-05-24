@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoUrl = "https://github.com/skrinsky/mirror-mirror.git"
-$Vst3Dest = "$env:LOCALAPPDATA\Programs\Common\VST3"
+$Vst3Dest = "$env:APPDATA\VST3"   # per-user path, no admin needed; scanned by Ableton/Reaper/etc
 
 function Write-Info  { Write-Host ">>> $args" -ForegroundColor Cyan }
 function Write-Ok    { Write-Host "OK  $args" -ForegroundColor Green }
@@ -113,12 +113,7 @@ Write-Ok "Python environment ready"
 Write-Info "Fetching latest release from GitHub..."
 try {
     $release = Invoke-RestMethod "https://api.github.com/repos/skrinsky/mirror-mirror/releases/latest"
-    $vst3Asset = $release.assets | Where-Object { $_.name -match "VST3.*Windows" } | Select-Object -First 1
-
-    if (-not $vst3Asset) {
-        # Fall back to any VST3 asset
-        $vst3Asset = $release.assets | Where-Object { $_.name -match "VST3" } | Select-Object -First 1
-    }
+    $vst3Asset = $release.assets | Where-Object { $_.name -match "(?i)windows.*vst3|vst3.*windows|win.*vst3|vst3.*win" } | Select-Object -First 1
 
     if ($vst3Asset) {
         $tmp = "$env:TEMP\mirror-mirror-vst3.zip"
@@ -134,8 +129,12 @@ try {
         Remove-Item $tmp, $tmpExtract -Recurse -Force -ErrorAction SilentlyContinue
         Write-Ok "VST3 installed to $Vst3Dest"
     } else {
-        Write-Host "  No VST3 release asset found." -ForegroundColor Yellow
-        Write-Host "  Build from source with install-dev.sh (requires Visual Studio)."
+        Write-Host ""
+        Write-Host "  NOTE: No Windows VST3 found in GitHub releases." -ForegroundColor Yellow
+        Write-Host "  The Python server is fully installed and ready." -ForegroundColor Yellow
+        Write-Host "  To get the plugin you have two options:" -ForegroundColor Yellow
+        Write-Host "    A) Wait for a Windows release to be published to GitHub." -ForegroundColor Yellow
+        Write-Host "    B) Build from source: install Visual Studio + cmake, then run install-dev.sh." -ForegroundColor Yellow
     }
 } catch {
     Write-Host "  No release found on GitHub yet." -ForegroundColor Yellow
