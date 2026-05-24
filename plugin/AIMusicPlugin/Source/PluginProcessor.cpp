@@ -165,11 +165,11 @@ void AIMusicProcessor::tryLaunchServerFromRepoRoot (const juce::File& repoRoot)
     auto pythonBin  = pythonVenv.existsAsFile() ? pythonVenv.getFullPathName()
                                                  : juce::String ("python");
     juce::ChildProcess proc;
-    if (proc.start ({ pythonBin,
-                      serverScript.getFullPathName(),
-                      "--root", repoRoot.getFullPathName() }))
-        serverPid = (int) proc.getPID();
+    proc.start ({ pythonBin,
+                  serverScript.getFullPathName(),
+                  "--root", repoRoot.getFullPathName() });
     // proc goes out of scope; child process keeps running on Windows.
+    // ChildProcess has no getPID() in JUCE 8 — server will die when Reaper exits.
 #else
     auto q = [] (const juce::String& s) { return "\"" + s + "\""; };
 
