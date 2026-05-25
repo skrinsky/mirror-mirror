@@ -167,7 +167,8 @@ except Exception as e:
 
 try:
     import torchcrepe
-    print("torchcrepe:", torchcrepe.__version__)
+    version = getattr(torchcrepe, '__version__', 'ok')
+    print("torchcrepe:", version)
 except Exception as e:
     print("torchcrepe import FAILED (optional):", e)
 
