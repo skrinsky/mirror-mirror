@@ -113,27 +113,19 @@ if [[ "$OS" == "Darwin" ]]; then
         ok "VST3 installed to $VST3_DEST"
     fi
 
-    # Install AU
+    # Install AU directly to system path — works for all Mac configurations
+    # (native arm64, Rosetta x86_64, Intel). Uses osascript so the password
+    # dialog appears even when the script is run via curl | bash.
     AU_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*au[^"]*"' | grep -oi 'https://[^"]*' | head -1)"
     if [[ -n "$AU_URL" ]]; then
         info "Downloading AU..."
         curl -fsSL "$AU_URL" -o "$TMP_DIR/au.zip"
         unzip -qo "$TMP_DIR/au.zip" -d "$TMP_DIR/au"
-        AU_DEST="$HOME/Library/Audio/Plug-Ins/Components"
-        mkdir -p "$AU_DEST"
-        rm -rf "$AU_DEST/$PLUGIN.component"
-        cp -r "$TMP_DIR/au/$PLUGIN.component" "$AU_DEST/"
-        xattr -cr "$AU_DEST/$PLUGIN.component" 2>/dev/null || true
-        ok "AU installed to $AU_DEST"
-
-        # Also install to the system path — Logic on some configurations only
-        # scans /Library/ (e.g. Rosetta on Apple Silicon, or certain Intel setups).
-        info "Also installing AU to system path for full DAW compatibility (requires password)..."
-        sudo mkdir -p "/Library/Audio/Plug-Ins/Components"
-        sudo rm -rf "/Library/Audio/Plug-Ins/Components/$PLUGIN.component"
-        sudo cp -r "$AU_DEST/$PLUGIN.component" "/Library/Audio/Plug-Ins/Components/"
-        sudo xattr -cr "/Library/Audio/Plug-Ins/Components/$PLUGIN.component" 2>/dev/null || true
-        ok "AU also installed to /Library/Audio/Plug-Ins/Components"
+        AU_SRC="$TMP_DIR/au/$PLUGIN.component"
+        info "Installing AU (a password dialog will appear)..."
+        osascript -e "do shell script \"mkdir -p '/Library/Audio/Plug-Ins/Components' && rm -rf '/Library/Audio/Plug-Ins/Components/$PLUGIN.component' && cp -r '$AU_SRC' '/Library/Audio/Plug-Ins/Components/' && xattr -cr '/Library/Audio/Plug-Ins/Components/$PLUGIN.component'\" with administrator privileges" \
+            && ok "AU installed to /Library/Audio/Plug-Ins/Components" \
+            || echo -e "${YELLOW}Warning:${NC} AU install skipped (password cancelled or not an admin)."
     fi
 
 elif [[ "$OS" == "Linux" ]]; then
@@ -159,8 +151,7 @@ echo ""
 if [[ "$OS" == "Darwin" ]]; then
     echo "  Plugin installed to:"
     [[ -n "${VST3_URL:-}" ]] && echo "    ~/Library/Audio/Plug-Ins/VST3/MirrorMirror.vst3"
-    [[ -n "${AU_URL:-}" ]]   && echo "    ~/Library/Audio/Plug-Ins/Components/MirrorMirror.component"
-    [[ -n "${AU_URL:-}" ]] && echo "    /Library/Audio/Plug-Ins/Components/MirrorMirror.component (system)"
+    [[ -n "${AU_URL:-}" ]]   && echo "    /Library/Audio/Plug-Ins/Components/MirrorMirror.component"
 fi
 echo ""
 echo "  Repo location: $INSTALL_DIR"
