@@ -164,43 +164,20 @@ void AIMusicProcessor::tryLaunchServerFromRepoRoot (const juce::File& repoRoot)
     auto serverScript = repoRoot.getChildFile ("plugin/server.py");
     if (! serverScript.existsAsFile()) return;
 
+    // Run the venv Python directly — no bash, no activation needed.
+    // The venv Python already has its own site-packages on all platforms.
 #if JUCE_WINDOWS
-    // On Windows: run the venv Python directly — no bash, no blocking wait.
-    // The venv Python already knows its own site-packages so no activation needed.
     auto pythonVenv = repoRoot.getChildFile (".venv\\Scripts\\python.exe");
-    auto pythonBin  = pythonVenv.existsAsFile() ? pythonVenv.getFullPathName()
-                                                 : juce::String ("python");
+#else
+    auto pythonVenv = repoRoot.getChildFile (".venv/bin/python");
+#endif
+    auto pythonBin = pythonVenv.existsAsFile() ? pythonVenv.getFullPathName()
+                                               : juce::String ("python3");
     juce::ChildProcess proc;
     proc.start ({ pythonBin,
                   serverScript.getFullPathName(),
                   "--root", repoRoot.getFullPathName() });
-    // proc goes out of scope; child process keeps running on Windows.
-    // ChildProcess has no getPID() in JUCE 8 — server will die when Reaper exits.
-#else
-    auto q = [] (const juce::String& s) { return "\"" + s + "\""; };
-
-    juce::String pidFile = juce::File::getSpecialLocation (
-        juce::File::tempDirectory).getChildFile ("mirrormirror_server.pid").getFullPathName();
-
-    auto activate = repoRoot.getChildFile (".venv/bin/activate");
-    juce::String shellCmd;
-    if (activate.existsAsFile())
-        shellCmd = ". " + q (activate.getFullPathName())
-                 + " && python " + q (serverScript.getFullPathName())
-                 + " --root " + q (repoRoot.getFullPathName())
-                 + " > /dev/null 2>&1 & echo $! > " + q (pidFile);
-    else
-        shellCmd = "python3 " + q (serverScript.getFullPathName())
-                 + " --root " + q (repoRoot.getFullPathName())
-                 + " > /dev/null 2>&1 & echo $! > " + q (pidFile);
-
-    juce::ChildProcess shell;
-    shell.start ({ "/bin/bash", "-c", shellCmd });
-    shell.waitForProcessToFinish (3000);
-
-    // Read back the PID so we can kill the server when the plugin unloads.
-    serverPid = juce::File (pidFile).loadFileAsString().trim().getIntValue();
-#endif
+    // proc goes out of scope; child process keeps running detached.
 }
 
 juce::PropertiesFile* AIMusicProcessor::getPrefs()
