@@ -113,18 +113,17 @@ if [[ "$OS" == "Darwin" ]]; then
         ok "VST3 installed to $VST3_DEST"
     fi
 
-    # Install AU
+    # Install AU — save into the install dir so the sudo command below can
+    # copy from a known persistent path rather than ~/Library or a temp folder.
     AU_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*au[^"]*"' | grep -oi 'https://[^"]*' | head -1)"
     if [[ -n "$AU_URL" ]]; then
         info "Downloading AU..."
         curl -fsSL "$AU_URL" -o "$TMP_DIR/au.zip"
         unzip -qo "$TMP_DIR/au.zip" -d "$TMP_DIR/au"
-        AU_DEST="$HOME/Library/Audio/Plug-Ins/Components"
-        mkdir -p "$AU_DEST"
-        rm -rf "$AU_DEST/$PLUGIN.component"
-        cp -r "$TMP_DIR/au/$PLUGIN.component" "$AU_DEST/"
-        xattr -cr "$AU_DEST/$PLUGIN.component" 2>/dev/null || true
-        ok "AU installed to $AU_DEST"
+        rm -rf "$INSTALL_DIR/$PLUGIN.component"
+        cp -r "$TMP_DIR/au/$PLUGIN.component" "$INSTALL_DIR/"
+        xattr -cr "$INSTALL_DIR/$PLUGIN.component" 2>/dev/null || true
+        ok "AU downloaded to $INSTALL_DIR/$PLUGIN.component"
     fi
 
 elif [[ "$OS" == "Linux" ]]; then
@@ -150,7 +149,7 @@ echo ""
 if [[ "$OS" == "Darwin" ]]; then
     echo "  Plugin installed to:"
     [[ -n "${VST3_URL:-}" ]] && echo "    ~/Library/Audio/Plug-Ins/VST3/MirrorMirror.vst3"
-    [[ -n "${AU_URL:-}" ]]   && echo "    ~/Library/Audio/Plug-Ins/Components/MirrorMirror.component"
+    [[ -n "${AU_URL:-}" ]]   && echo "    $INSTALL_DIR/$PLUGIN.component  (run the sudo command below to install it)"
 fi
 echo ""
 echo "  Repo location: $INSTALL_DIR"
