@@ -122,10 +122,12 @@ if [[ "$OS" == "Darwin" ]]; then
         curl -fsSL "$AU_URL" -o "$TMP_DIR/au.zip"
         unzip -qo "$TMP_DIR/au.zip" -d "$TMP_DIR/au"
         AU_SRC="$TMP_DIR/au/$PLUGIN.component"
-        info "Installing AU (a password dialog will appear)..."
-        osascript -e "do shell script \"mkdir -p '/Library/Audio/Plug-Ins/Components' && rm -rf '/Library/Audio/Plug-Ins/Components/$PLUGIN.component' && cp -r '$AU_SRC' '/Library/Audio/Plug-Ins/Components/' && xattr -cr '/Library/Audio/Plug-Ins/Components/$PLUGIN.component'\" with administrator privileges" \
-            && ok "AU installed to /Library/Audio/Plug-Ins/Components" \
-            || echo -e "${YELLOW}Warning:${NC} AU install skipped (password cancelled or not an admin)."
+        info "Installing AU to system path (you will be prompted for your password)..."
+        sudo mkdir -p "/Library/Audio/Plug-Ins/Components"
+        sudo rm -rf "/Library/Audio/Plug-Ins/Components/$PLUGIN.component"
+        sudo cp -r "$AU_SRC" "/Library/Audio/Plug-Ins/Components/"
+        sudo xattr -cr "/Library/Audio/Plug-Ins/Components/$PLUGIN.component" 2>/dev/null || true
+        ok "AU installed to /Library/Audio/Plug-Ins/Components"
     fi
 
 elif [[ "$OS" == "Linux" ]]; then
