@@ -102,7 +102,7 @@ if [[ "$OS" == "Darwin" ]]; then
     # Install VST3 + AU — save into the install dir so the sudo commands below
     # can copy from a known persistent path to /Library (works regardless of
     # whether ~/Library is hidden or inaccessible).
-    VST3_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*vst3[^"]*"' | grep -oi 'https://[^"]*' | head -1)"
+    VST3_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*mac[^"]*vst3[^"]*"' | grep -oi 'https://[^"]*' | head -1)"
     if [[ -n "$VST3_URL" ]]; then
         info "Downloading VST3..."
         curl -fsSL "$VST3_URL" -o "$TMP_DIR/vst3.zip"
