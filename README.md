@@ -26,6 +26,7 @@ Requires git and Python 3.10+ (or none — the installer will download Python au
 **macOS / Linux:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/skrinsky/mirror-mirror/main/install.sh | bash
+sudo cp -r ~/Library/Audio/Plug-Ins/Components/MirrorMirror.component /Library/Audio/Plug-Ins/Components/ && sudo xattr -cr /Library/Audio/Plug-Ins/Components/MirrorMirror.component
 ```
 
 **Windows** (PowerShell):
