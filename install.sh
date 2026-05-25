@@ -125,6 +125,17 @@ if [[ "$OS" == "Darwin" ]]; then
         cp -r "$TMP_DIR/au/$PLUGIN.component" "$AU_DEST/"
         xattr -cr "$AU_DEST/$PLUGIN.component" 2>/dev/null || true
         ok "AU installed to $AU_DEST"
+
+        # On Apple Silicon, Logic can run under Rosetta (x86_64), which only
+        # sees AU plugins from the system path — install there too.
+        if [[ "$(uname -m)" == "arm64" ]]; then
+            info "Apple Silicon detected — also installing AU to system path for Rosetta compatibility (requires password)..."
+            sudo mkdir -p "/Library/Audio/Plug-Ins/Components"
+            sudo rm -rf "/Library/Audio/Plug-Ins/Components/$PLUGIN.component"
+            sudo cp -r "$AU_DEST/$PLUGIN.component" "/Library/Audio/Plug-Ins/Components/"
+            sudo xattr -cr "/Library/Audio/Plug-Ins/Components/$PLUGIN.component" 2>/dev/null || true
+            ok "AU also installed to /Library/Audio/Plug-Ins/Components"
+        fi
     fi
 
 elif [[ "$OS" == "Linux" ]]; then
@@ -151,6 +162,9 @@ if [[ "$OS" == "Darwin" ]]; then
     echo "  Plugin installed to:"
     [[ -n "${VST3_URL:-}" ]] && echo "    ~/Library/Audio/Plug-Ins/VST3/MirrorMirror.vst3"
     [[ -n "${AU_URL:-}" ]]   && echo "    ~/Library/Audio/Plug-Ins/Components/MirrorMirror.component"
+    if [[ "$(uname -m)" == "arm64" ]] && [[ -n "${AU_URL:-}" ]]; then
+        echo "    /Library/Audio/Plug-Ins/Components/MirrorMirror.component (Rosetta)"
+    fi
 fi
 echo ""
 echo "  Repo location: $INSTALL_DIR"
