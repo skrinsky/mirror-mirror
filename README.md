@@ -37,6 +37,8 @@ This downloads the pre-built plugin from the [Releases page](https://github.com/
 
 After it finishes, rescan plugins in your DAW — **MirrorMirror** will appear.
 
+> **Apple Silicon + Rosetta:** If you are running Logic under Rosetta (older Logic versions), two extra steps are needed after install. See [below](#apple-silicon-macs-running-logic-under-rosetta).
+
 ### For developers (build from source)
 
 Requires Xcode Command Line Tools and cmake. JUCE is fetched automatically by CMake on first build. See [Requirements](#requirements) below.
