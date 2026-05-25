@@ -40,12 +40,19 @@ if [[ ! -d "${PIPE_DIR}" ]]; then
   exit 1
 fi
 
-# Create venv
+# Create venv — recreate if existing venv uses an incompatible Python (e.g. 3.13)
+if [[ -d "${VENV_DIR}" ]]; then
+  EXISTING_MINOR="$("${VENV_PY}" -c 'import sys; print(sys.version_info.minor)' 2>/dev/null || echo 0)"
+  if [[ "$EXISTING_MINOR" -gt 12 ]]; then
+    echo "== Existing venv uses Python 3.${EXISTING_MINOR} (incompatible) — recreating with 3.10 =="
+    rm -rf "${VENV_DIR}"
+  else
+    echo "== Venv already exists (Python 3.${EXISTING_MINOR}) =="
+  fi
+fi
 if [[ ! -d "${VENV_DIR}" ]]; then
   echo "== Creating venv =="
   uv venv --python "${PYTHON_BIN}" "${VENV_DIR}"
-else
-  echo "== Venv already exists =="
 fi
 
 # setuptools is needed by torchcrepe and other pkg_resources users.
