@@ -120,10 +120,12 @@ if [[ "$OS" == "Darwin" ]]; then
         info "Downloading AU..."
         curl -fsSL "$AU_URL" -o "$TMP_DIR/au.zip"
         unzip -qo "$TMP_DIR/au.zip" -d "$TMP_DIR/au"
+        AU_SRC="$(find "$TMP_DIR/au" -name "$PLUGIN.component" -maxdepth 3 | head -1)"
+        [[ -n "$AU_SRC" ]] || die "Could not find $PLUGIN.component in the downloaded AU archive"
         rm -rf "$INSTALL_DIR/$PLUGIN.component"
-        cp -r "$TMP_DIR/au/$PLUGIN.component" "$INSTALL_DIR/"
+        cp -r "$AU_SRC" "$INSTALL_DIR/"
         xattr -cr "$INSTALL_DIR/$PLUGIN.component" 2>/dev/null || true
-        ok "AU downloaded to $INSTALL_DIR/$PLUGIN.component"
+        ok "AU saved to $INSTALL_DIR/$PLUGIN.component"
     fi
 
 elif [[ "$OS" == "Linux" ]]; then
