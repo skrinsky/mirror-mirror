@@ -247,7 +247,23 @@ void AIMusicProcessor::discoverRepoRoot()
         { repoRoot = appSupport; return; }
     }
 
-    // Quick-installer clones to ~/mirror-mirror on macOS, Linux, and Windows
+    // install.sh writes the install path here so the plugin always finds it
+    {
+        auto configFile = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                              .getChildFile ("MirrorMirror/install_path.txt");
+        if (configFile.existsAsFile())
+        {
+            auto path = configFile.loadFileAsString().trim();
+            if (path.isNotEmpty())
+            {
+                auto root = juce::File (path);
+                if (root.getChildFile ("plugin/server.py").existsAsFile())
+                { repoRoot = root; return; }
+            }
+        }
+    }
+
+    // Quick-installer default location fallback
     {
         auto defaultInstall = juce::File::getSpecialLocation (juce::File::userHomeDirectory)
                                   .getChildFile ("mirror-mirror");

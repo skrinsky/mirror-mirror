@@ -138,6 +138,14 @@ elif [[ "$OS" == "Linux" ]]; then
     fi
 fi
 
+# ── Write install path so the plugin can find the server ─────────────────────
+if [[ "$OS" == "Darwin" ]]; then
+    APP_SUPPORT="$HOME/Library/Application Support/MirrorMirror"
+    mkdir -p "$APP_SUPPORT"
+    echo "$INSTALL_DIR" > "$APP_SUPPORT/install_path.txt"
+    ok "Install path recorded for plugin"
+fi
+
 # ── Python environment ────────────────────────────────────────────────────────
 info "Setting up Python environment (this may take a few minutes)..."
 PYTHON_BIN="$PYTHON_BIN" bash "$INSTALL_DIR/scripts/setup_venv.sh"
