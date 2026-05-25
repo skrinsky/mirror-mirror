@@ -247,15 +247,13 @@ void AIMusicProcessor::discoverRepoRoot()
         { repoRoot = appSupport; return; }
     }
 
-   #if JUCE_WINDOWS
-    // Windows quick-installer clones to %USERPROFILE%\mirror-mirror by default
+    // Quick-installer clones to ~/mirror-mirror on macOS, Linux, and Windows
     {
-        auto winDefault = juce::File::getSpecialLocation (juce::File::userHomeDirectory)
-                              .getChildFile ("mirror-mirror");
-        if (winDefault.getChildFile ("plugin/server.py").existsAsFile())
-        { repoRoot = winDefault; return; }
+        auto defaultInstall = juce::File::getSpecialLocation (juce::File::userHomeDirectory)
+                                  .getChildFile ("mirror-mirror");
+        if (defaultInstall.getChildFile ("plugin/server.py").existsAsFile())
+        { repoRoot = defaultInstall; return; }
     }
-   #endif
 
     auto pluginDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
                          .getParentDirectory();
