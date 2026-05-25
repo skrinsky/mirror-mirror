@@ -99,22 +99,23 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 PLUGIN="MirrorMirror"
 
 if [[ "$OS" == "Darwin" ]]; then
-    # Install VST3
+    # Install VST3 + AU — save into the install dir so the sudo commands below
+    # can copy from a known persistent path to /Library (works regardless of
+    # whether ~/Library is hidden or inaccessible).
     VST3_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*vst3[^"]*"' | grep -oi 'https://[^"]*' | head -1)"
     if [[ -n "$VST3_URL" ]]; then
         info "Downloading VST3..."
         curl -fsSL "$VST3_URL" -o "$TMP_DIR/vst3.zip"
         unzip -qo "$TMP_DIR/vst3.zip" -d "$TMP_DIR/vst3"
-        VST3_DEST="$HOME/Library/Audio/Plug-Ins/VST3"
-        mkdir -p "$VST3_DEST"
-        rm -rf "$VST3_DEST/$PLUGIN.vst3"
-        cp -r "$TMP_DIR/vst3/$PLUGIN.vst3" "$VST3_DEST/"
-        xattr -cr "$VST3_DEST/$PLUGIN.vst3" 2>/dev/null || true
-        ok "VST3 installed to $VST3_DEST"
+        VST3_SRC="$(find "$TMP_DIR/vst3" -name "$PLUGIN.vst3" -maxdepth 3 | head -1)"
+        [[ -n "$VST3_SRC" ]] || die "Could not find $PLUGIN.vst3 in the downloaded VST3 archive"
+        rm -rf "$INSTALL_DIR/$PLUGIN.vst3"
+        cp -r "$VST3_SRC" "$INSTALL_DIR/"
+        xattr -cr "$INSTALL_DIR/$PLUGIN.vst3" 2>/dev/null || true
+        ok "VST3 saved to $INSTALL_DIR/$PLUGIN.vst3"
     fi
 
-    # Install AU — save into the install dir so the sudo command below can
-    # copy from a known persistent path rather than ~/Library or a temp folder.
+    # Install AU
     AU_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*au[^"]*"' | grep -oi 'https://[^"]*' | head -1)"
     if [[ -n "$AU_URL" ]]; then
         info "Downloading AU..."
@@ -149,9 +150,9 @@ echo -e "${GREEN}  Mirror Mirror installed successfully!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 if [[ "$OS" == "Darwin" ]]; then
-    echo "  Plugin installed to:"
-    [[ -n "${VST3_URL:-}" ]] && echo "    ~/Library/Audio/Plug-Ins/VST3/MirrorMirror.vst3"
-    [[ -n "${AU_URL:-}" ]]   && echo "    $INSTALL_DIR/$PLUGIN.component  (run the sudo command below to install it)"
+    echo "  Plugins saved to $INSTALL_DIR — run these to install to your DAW:"
+    [[ -n "${VST3_URL:-}" ]] && echo "    sudo cp -r $INSTALL_DIR/$PLUGIN.vst3 /Library/Audio/Plug-Ins/VST3/ && sudo xattr -cr /Library/Audio/Plug-Ins/VST3/$PLUGIN.vst3"
+    [[ -n "${AU_URL:-}" ]]   && echo "    sudo cp -r $INSTALL_DIR/$PLUGIN.component /Library/Audio/Plug-Ins/Components/ && sudo xattr -cr /Library/Audio/Plug-Ins/Components/$PLUGIN.component"
 fi
 echo ""
 echo "  Repo location: $INSTALL_DIR"
