@@ -51,8 +51,10 @@ if [[ -d "${VENV_DIR}" ]]; then
   fi
 fi
 if [[ ! -d "${VENV_DIR}" ]]; then
+  echo "== Ensuring Python 3.10 is available =="
+  uv python install 3.10
   echo "== Creating venv =="
-  uv venv --python "${PYTHON_BIN}" "${VENV_DIR}"
+  uv venv --python 3.10 "${VENV_DIR}"
 fi
 
 # setuptools is needed by torchcrepe and other pkg_resources users.
