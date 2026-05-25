@@ -18,6 +18,23 @@ Start:
 import argparse
 import os
 import re
+
+# Detach from the parent process group so the server survives the DAW closing
+# (e.g. during a long training run). Harmless if already a group leader.
+try:
+    os.setsid()
+except OSError:
+    pass
+
+# Write PID so the plugin destructor can kill us when not training.
+import tempfile as _tempfile
+_pid_path = os.path.join(_tempfile.gettempdir(), "mirrormirror_server.pid")
+try:
+    with open(_pid_path, "w") as _pf:
+        _pf.write(str(os.getpid()))
+except OSError:
+    pass
+
 import subprocess
 import sys
 import threading

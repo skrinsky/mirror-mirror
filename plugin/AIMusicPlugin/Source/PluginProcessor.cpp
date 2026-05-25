@@ -1,6 +1,11 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <algorithm>
+#if !JUCE_WINDOWS
+# include <unistd.h>
+# include <sys/wait.h>
+# include <fcntl.h>
+#endif
 
 #if JUCE_MAC
 # include <AudioUnit/AudioUnit.h>
@@ -135,12 +140,23 @@ AIMusicProcessor::~AIMusicProcessor()
     previewTransport.setSource (nullptr);
 #endif
     // Kill the server unless training is in progress (training should survive DAW close).
-    if (lastStatus.stage != "training" && serverPid > 0)
+    // The server writes its PID to a known temp file; we read it here.
+    if (lastStatus.stage != "training")
     {
        #if JUCE_WINDOWS
+        if (serverPid > 0)
         { juce::ChildProcess p; p.start ("taskkill /F /PID " + juce::String (serverPid)); p.waitForProcessToFinish (3000); }
        #else
-        ::kill (serverPid, SIGTERM);
+        auto pidFile = juce::File ("/tmp/mirrormirror_server.pid");
+        if (pidFile.existsAsFile())
+        {
+            int pid = pidFile.loadFileAsString().trim().getIntValue();
+            if (pid > 0)
+            {
+                ::kill (pid, SIGTERM);
+                pidFile.deleteFile();
+            }
+        }
        #endif
     }
 }
@@ -164,20 +180,52 @@ void AIMusicProcessor::tryLaunchServerFromRepoRoot (const juce::File& repoRoot)
     auto serverScript = repoRoot.getChildFile ("plugin/server.py");
     if (! serverScript.existsAsFile()) return;
 
-    // Run the venv Python directly — no bash, no activation needed.
-    // The venv Python already has its own site-packages on all platforms.
 #if JUCE_WINDOWS
     auto pythonVenv = repoRoot.getChildFile (".venv\\Scripts\\python.exe");
-#else
-    auto pythonVenv = repoRoot.getChildFile (".venv/bin/python");
-#endif
-    auto pythonBin = pythonVenv.existsAsFile() ? pythonVenv.getFullPathName()
-                                               : juce::String ("python3");
+    auto pythonBin  = pythonVenv.existsAsFile() ? pythonVenv.getFullPathName()
+                                                : juce::String ("python");
     juce::ChildProcess proc;
     proc.start ({ pythonBin,
                   serverScript.getFullPathName(),
                   "--root", repoRoot.getFullPathName() });
-    // proc goes out of scope; child process keeps running detached.
+#else
+    // Double-fork daemon: parent waits for first child (avoids zombie), first child
+    // calls setsid() then forks again and exits, grandchild execs the server.
+    // The grandchild is no longer in the plugin's process group, so JUCE's ChildProcess
+    // destructor cannot kill it and it survives the DAW closing.
+    auto pythonBin = repoRoot.getChildFile (".venv/bin/python");
+    if (! pythonBin.existsAsFile()) return;
+
+    const char* pyPath     = pythonBin.getFullPathName().toRawUTF8();
+    const char* scriptPath = serverScript.getFullPathName().toRawUTF8();
+    const char* rootPath   = repoRoot.getFullPathName().toRawUTF8();
+
+    pid_t pid = ::fork();
+    if (pid < 0) return;
+
+    if (pid == 0)
+    {
+        // First child
+        ::setsid();
+
+        pid_t pid2 = ::fork();
+        if (pid2 < 0)  ::_exit (1);
+        if (pid2 > 0)  ::_exit (0);  // first child exits; grandchild keeps going
+
+        // Grandchild — becomes the daemon
+        int logFd = ::open ("/tmp/mirrormirror_server.log",
+                            O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (logFd >= 0) { ::dup2 (logFd, STDOUT_FILENO); ::dup2 (logFd, STDERR_FILENO); ::close (logFd); }
+        int devNull = ::open ("/dev/null", O_RDONLY);
+        if (devNull >= 0) { ::dup2 (devNull, STDIN_FILENO); ::close (devNull); }
+
+        ::execl (pyPath, "python", scriptPath, "--root", rootPath, nullptr);
+        ::_exit (1);
+    }
+
+    // Parent: reap the first child immediately
+    ::waitpid (pid, nullptr, 0);
+#endif
 }
 
 juce::PropertiesFile* AIMusicProcessor::getPrefs()
