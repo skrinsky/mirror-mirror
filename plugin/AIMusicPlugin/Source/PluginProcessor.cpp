@@ -64,24 +64,9 @@ AIMusicProcessor::AIMusicProcessor()
     auto saved = getPref ("lastAudioDir");
     if (saved.isNotEmpty()) audioFolder = saved;
 
-#if JUCE_MAC
-    // Apple DLS MusicDevice (GM sounds, built into every Mac)
-    AudioComponentDescription desc = {};
-    desc.componentType         = kAudioUnitType_MusicDevice;
-    desc.componentSubType      = kAudioUnitSubType_DLSSynth;
-    desc.componentManufacturer = kAudioUnitManufacturer_Apple;
-    if (auto* comp = AudioComponentFindNext (nullptr, &desc))
-    {
-        AudioUnit au = nullptr;
-        if (AudioComponentInstanceNew (comp, &au) == noErr && au != nullptr)
-        {
-            if (AudioUnitInitialize (au) == noErr)
-                previewDLSSynth = au;
-            else
-                AudioComponentInstanceDispose (au);
-        }
-    }
-#else
+#if !JUCE_MAC
+    // macOS: DLS Synth is created lazily in prepareToPlay to avoid nested
+    // AudioComponentInstanceNew calls during factory instantiation (returns -1 on macOS 13).
     previewFormatManager.registerBasicFormats();
 #endif
 }
@@ -89,6 +74,27 @@ AIMusicProcessor::AIMusicProcessor()
 void AIMusicProcessor::prepareToPlay (double sampleRate, int blockSize)
 {
 #if JUCE_MAC
+    // Create DLS Synth here (not in constructor) to avoid nested AudioComponentInstanceNew
+    // calls during factory instantiation which return -1 on macOS 13.
+    if (previewDLSSynth == nullptr)
+    {
+        AudioComponentDescription desc = {};
+        desc.componentType         = kAudioUnitType_MusicDevice;
+        desc.componentSubType      = kAudioUnitSubType_DLSSynth;
+        desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+        if (auto* comp = AudioComponentFindNext (nullptr, &desc))
+        {
+            AudioUnit au = nullptr;
+            if (AudioComponentInstanceNew (comp, &au) == noErr && au != nullptr)
+            {
+                if (AudioUnitInitialize (au) == noErr)
+                    previewDLSSynth = au;
+                else
+                    AudioComponentInstanceDispose (au);
+            }
+        }
+    }
+
     if (auto au = toAU (previewDLSSynth))
     {
         auto sr = sampleRate;

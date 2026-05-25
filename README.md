@@ -100,6 +100,17 @@ This automatically installs:
 
 Then **rescan plugins in your DAW**. In Logic Pro: *Logic Pro -> Plug-in Manager -> Reset & Rescan*. MirrorMirror will appear under AU and VST3i instrument categories.
 
+#### Apple Silicon Macs running Logic under Rosetta
+
+Logic Pro 10.7+ runs natively on Apple Silicon and is the recommended setup -- no extra steps needed. If you are on an older Logic version that requires Rosetta (x86_64), macOS only exposes AU plugins from the system plugin folder to Rosetta hosts. Run these two extra commands after building:
+
+```bash
+sudo cp -r ~/Library/Audio/Plug-Ins/Components/MirrorMirror.component /Library/Audio/Plug-Ins/Components/
+sudo xattr -cr /Library/Audio/Plug-Ins/Components/MirrorMirror.component
+```
+
+To check your Logic version: *Logic Pro -> About Logic Pro*. If it is 10.7 or later, you can disable Rosetta instead: right-click Logic Pro in Finder -> Get Info -> uncheck "Open using Rosetta", then relaunch Logic.
+
 ---
 
 ## Plugin walkthrough
@@ -284,7 +295,7 @@ Fine-tuning works best when your new material is stylistically related to the ba
 ## Troubleshooting
 
 **Plugin doesn't appear after building**
-Rescan plugins in your DAW. Logic Pro: *Logic Pro -> Plug-in Manager -> Reset & Rescan*.
+Rescan plugins in your DAW. Logic Pro: *Logic Pro -> Plug-in Manager -> Reset & Rescan*. If you are on an Apple Silicon Mac running Logic under Rosetta, see the [Rosetta note](#apple-silicon-macs-running-logic-under-rosetta) in the build section above.
 
 **Status stays "idle" / server not reachable**
 The plugin couldn't launch the server. If you used the pkg installer, check the log:

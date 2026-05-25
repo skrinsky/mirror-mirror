@@ -3,6 +3,12 @@ project(AIMusicPlugin VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# Universal binary on macOS so the plugin loads under both native arm64 and Rosetta (x86_64)
+if(APPLE)
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS version" FORCE)
+endif()
+
 # Static MSVC runtime so the VST3 is self-contained (no VC++ redist needed)
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -118,6 +124,7 @@ f=open(path,'wb'); plistlib.dump(pl,f); f.close(); print('Info.plist patched')"
         COMMAND codesign --force --sign - "${BUILD_COMPONENT}"
         COMMAND ${CMAKE_COMMAND} -E remove_directory "${USER_COMPONENT_DIR}"
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${BUILD_COMPONENT}" "${USER_COMPONENT_DIR}"
+        COMMAND xattr -cr "${USER_COMPONENT_DIR}"
         COMMENT "Patching, signing, and installing AU component to user Library"
         VERBATIM
     )
