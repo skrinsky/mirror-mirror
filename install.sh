@@ -47,23 +47,23 @@ fi
 command -v uv &>/dev/null || die "uv installation failed — install it manually: https://docs.astral.sh/uv/"
 ok "uv $(uv --version)"
 
-# ── Python (via uv — uses system Python 3.10+ or downloads one) ───────────────
+# ── Python (3.10-3.12 only — tensorflow-macos does not support 3.13+) ─────────
 PYTHON_BIN=""
 for candidate in python3 python; do
     if command -v "$candidate" &>/dev/null; then
         major=$("$candidate" -c 'import sys; print(sys.version_info.major)' 2>/dev/null)
         minor=$("$candidate" -c 'import sys; print(sys.version_info.minor)' 2>/dev/null)
-        if [[ "$major" == "3" && "$minor" -ge 10 ]]; then
+        if [[ "$major" == "3" && "$minor" -ge 10 && "$minor" -le 12 ]]; then
             PYTHON_BIN="$candidate"
             break
         fi
     fi
 done
-# If no suitable Python found, uv will download one when creating the venv.
+# If no suitable Python found, uv will download 3.10.
 if [[ -n "$PYTHON_BIN" ]]; then
     ok "Python $($PYTHON_BIN --version)"
 else
-    info "No system Python 3.10+ found — uv will download one automatically"
+    info "No system Python 3.10-3.12 found — uv will download Python 3.10 automatically"
 fi
 
 # ── Clone repo ────────────────────────────────────────────────────────────────
@@ -77,12 +77,8 @@ else
 fi
 ok "Repo at $INSTALL_DIR"
 
-# ── Python environment ────────────────────────────────────────────────────────
-info "Setting up Python environment (this may take a few minutes)..."
-PYTHON_BIN="$PYTHON_BIN" bash "$INSTALL_DIR/scripts/setup_venv.sh"
-ok "Python environment ready"
-
 # ── Download pre-built plugin ─────────────────────────────────────────────────
+# Done before venv setup so the plugin is saved even if Python setup fails.
 info "Fetching latest release info from GitHub..."
 RELEASE_JSON="$(curl -fsSL https://api.github.com/repos/skrinsky/mirror-mirror/releases/latest 2>/dev/null || true)"
 
@@ -99,9 +95,9 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 PLUGIN="MirrorMirror"
 
 if [[ "$OS" == "Darwin" ]]; then
-    # Install VST3 + AU — save into the install dir so the sudo commands below
-    # can copy from a known persistent path to /Library (works regardless of
-    # whether ~/Library is hidden or inaccessible).
+    # Save VST3 + AU into the install dir so the sudo commands below can copy
+    # from a known persistent path to /Library (works regardless of whether
+    # ~/Library is hidden or inaccessible).
     VST3_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*mac[^"]*vst3[^"]*"' | grep -oi 'https://[^"]*' | head -1)"
     if [[ -n "$VST3_URL" ]]; then
         info "Downloading VST3..."
@@ -115,7 +111,6 @@ if [[ "$OS" == "Darwin" ]]; then
         ok "VST3 saved to $INSTALL_DIR/$PLUGIN.vst3"
     fi
 
-    # Install AU
     AU_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*au[^"]*"' | grep -oi 'https://[^"]*' | head -1)"
     if [[ -n "$AU_URL" ]]; then
         info "Downloading AU..."
@@ -142,6 +137,11 @@ elif [[ "$OS" == "Linux" ]]; then
         ok "VST3 installed to $VST3_DEST"
     fi
 fi
+
+# ── Python environment ────────────────────────────────────────────────────────
+info "Setting up Python environment (this may take a few minutes)..."
+PYTHON_BIN="$PYTHON_BIN" bash "$INSTALL_DIR/scripts/setup_venv.sh"
+ok "Python environment ready"
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 echo ""
