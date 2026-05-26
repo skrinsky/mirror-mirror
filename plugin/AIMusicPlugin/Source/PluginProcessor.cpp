@@ -196,9 +196,14 @@ void AIMusicProcessor::tryLaunchServerFromRepoRoot (const juce::File& repoRoot)
     auto pythonBin = repoRoot.getChildFile (".venv/bin/python");
     if (! pythonBin.existsAsFile()) return;
 
-    const char* pyPath     = pythonBin.getFullPathName().toRawUTF8();
-    const char* scriptPath = serverScript.getFullPathName().toRawUTF8();
-    const char* rootPath   = repoRoot.getFullPathName().toRawUTF8();
+    // Store strings in named variables so they stay alive through fork().
+    // toRawUTF8() on a temporary is a dangling pointer after the semicolon.
+    juce::String pyPathStr     = pythonBin.getFullPathName();
+    juce::String scriptPathStr = serverScript.getFullPathName();
+    juce::String rootPathStr   = repoRoot.getFullPathName();
+    const char* pyPath     = pyPathStr.toRawUTF8();
+    const char* scriptPath = scriptPathStr.toRawUTF8();
+    const char* rootPath   = rootPathStr.toRawUTF8();
 
     pid_t pid = ::fork();
     if (pid < 0) return;
