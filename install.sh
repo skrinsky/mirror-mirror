@@ -159,8 +159,8 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 if [[ "$OS" == "Darwin" ]]; then
     echo "  Plugins saved to $INSTALL_DIR — run these to install to your DAW:"
-    [[ -n "${VST3_URL:-}" ]] && echo "    sudo cp -r $INSTALL_DIR/$PLUGIN.vst3 /Library/Audio/Plug-Ins/VST3/ && sudo xattr -cr /Library/Audio/Plug-Ins/VST3/$PLUGIN.vst3"
-    [[ -n "${AU_URL:-}" ]]   && echo "    sudo cp -r $INSTALL_DIR/$PLUGIN.component /Library/Audio/Plug-Ins/Components/ && sudo xattr -cr /Library/Audio/Plug-Ins/Components/$PLUGIN.component"
+    [[ -n "${VST3_URL:-}" ]] && echo "    sudo mkdir -p /Library/Audio/Plug-Ins/VST3 && sudo cp -r $INSTALL_DIR/$PLUGIN.vst3 /Library/Audio/Plug-Ins/VST3/ && sudo xattr -cr /Library/Audio/Plug-Ins/VST3/$PLUGIN.vst3"
+    [[ -n "${AU_URL:-}" ]]   && echo "    sudo mkdir -p /Library/Audio/Plug-Ins/Components && sudo cp -r $INSTALL_DIR/$PLUGIN.component /Library/Audio/Plug-Ins/Components/ && sudo xattr -cr /Library/Audio/Plug-Ins/Components/$PLUGIN.component"
 fi
 echo ""
 echo "  Repo location: $INSTALL_DIR"
