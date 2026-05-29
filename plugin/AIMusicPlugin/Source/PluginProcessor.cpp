@@ -196,6 +196,20 @@ void AIMusicProcessor::tryLaunchServerFromRepoRoot (const juce::File& repoRoot)
     auto pythonBin = repoRoot.getChildFile (".venv/bin/python");
     if (! pythonBin.existsAsFile()) return;
 
+    // If a server is already running (PID file exists and process is alive), don't spawn.
+    // This prevents the 5-second spawn loop from stacking up duplicate servers when
+    // uvicorn is still starting or the health-check hasn't responded yet.
+    {
+        auto pidFile = juce::File ("/tmp/mirrormirror_server.pid");
+        if (pidFile.existsAsFile())
+        {
+            pid_t existingPid = (pid_t) pidFile.loadFileAsString().trim().getIntValue();
+            if (existingPid > 0 && ::kill (existingPid, 0) == 0)
+                return;  // process is alive — don't spawn another
+            pidFile.deleteFile();  // stale PID from a previous crashed server
+        }
+    }
+
     // Store strings in named variables so they stay alive through fork().
     // toRawUTF8() on a temporary is a dangling pointer after the semicolon.
     juce::String pyPathStr     = pythonBin.getFullPathName();
@@ -670,7 +684,7 @@ void AIMusicProcessor::timerCallback()
     {
         // Relaunch at most once every 5 s — gives detached server time to start up
         auto nowMs = juce::Time::currentTimeMillis();
-        if (nowMs - lastServerLaunchMs > 5000)
+        if (nowMs - lastServerLaunchMs > 15000)
             launchServer();
     }
 

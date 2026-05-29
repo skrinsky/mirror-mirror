@@ -27,8 +27,9 @@ except OSError:
     pass
 
 # Write PID so the plugin destructor can kill us when not training.
-import tempfile as _tempfile
-_pid_path = os.path.join(_tempfile.gettempdir(), "mirrormirror_server.pid")
+# Use /tmp explicitly — tempfile.gettempdir() returns /var/folders/... on macOS
+# which does not match the hardcoded path the plugin destructor reads.
+_pid_path = "/tmp/mirrormirror_server.pid"
 try:
     with open(_pid_path, "w") as _pf:
         _pf.write(str(os.getpid()))
