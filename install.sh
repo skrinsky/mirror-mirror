@@ -151,6 +151,14 @@ info "Setting up Python environment (this may take a few minutes)..."
 PYTHON_BIN="$PYTHON_BIN" bash "$INSTALL_DIR/scripts/setup_venv.sh"
 ok "Python environment ready"
 
+# ── LaunchAgent (macOS only) ──────────────────────────────────────────────────
+# Install the server as a LaunchAgent so it starts at login and runs outside
+# the DAW's process tree (avoids macOS killing the auto-launched server).
+if [[ "$OS" == "Darwin" ]]; then
+    info "Installing server as LaunchAgent..."
+    bash "$INSTALL_DIR/scripts/install_launchagent.sh" --dir "$INSTALL_DIR"
+fi
+
 # ── Done ─────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}========================================${NC}"
