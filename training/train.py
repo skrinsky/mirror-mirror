@@ -575,6 +575,22 @@ def main():
     # NOTE: This only changes model hyperparams, not your tokenization.
     auto_scale = bool(args.auto_scale) and (not bool(args.no_auto_scale))
 
+    # When resuming from a checkpoint, lock architecture to match it so
+    # state_dict loads cleanly — don't let auto-scale pick different dims.
+    if args.resume and os.path.isfile(args.resume):
+        try:
+            _peek = torch.load(args.resume, map_location="cpu", weights_only=False)
+            _cfg  = _peek.get("model_config") or _peek.get("config") or {}
+            if _cfg.get("D_MODEL"):
+                D_MODEL  = int(_cfg["D_MODEL"])
+                N_LAYERS = int(_cfg.get("N_LAYERS", N_LAYERS))
+                N_HEADS  = int(_cfg.get("N_HEADS",  N_HEADS))
+                FF_MULT  = int(_cfg.get("FF_MULT",  FF_MULT))
+                auto_scale = False
+                print(f"Resume: locked model dims from checkpoint — d_model={D_MODEL} n_layers={N_LAYERS} n_heads={N_HEADS} ff_mult={FF_MULT}")
+        except Exception as _e:
+            print(f"Warning: could not read model_config from checkpoint ({_e}), proceeding with auto-scale")
+
     # Manual overrides disable auto-scale.
     if args.ff_mult is not None:
         FF_MULT = int(args.ff_mult)
