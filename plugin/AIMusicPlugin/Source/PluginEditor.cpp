@@ -1712,9 +1712,16 @@ struct AdvancedPanel : public juce::Component
         proc.discoverRepoRoot();   // ensure repoRoot is populated even if server was already up
         if (proc.repoRoot.exists())
         {
-            auto candidate = proc.repoRoot.getChildFile ("runs/checkpoints/es_model.pt");
-            if (candidate.existsAsFile())
-                proc.pretrainCkpt = candidate.getFullPathName();
+            // Prefer lakh_base.pt (trained on Lakh MIDI); fall back to es_model.pt
+            for (auto name : { "runs/checkpoints/lakh_base.pt", "runs/checkpoints/es_model.pt" })
+            {
+                auto candidate = proc.repoRoot.getChildFile (name);
+                if (candidate.existsAsFile())
+                {
+                    proc.pretrainCkpt = candidate.getFullPathName();
+                    break;
+                }
+            }
         }
         // Lock seq_len to match the base checkpoint; unlock when fine-tune is off.
         // Also appends / strips "_fine_tune" suffix on the project name.

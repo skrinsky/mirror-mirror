@@ -711,15 +711,30 @@ def main():
             print(f"ERROR: --resume path not found: {args.resume}", file=sys.stderr)
             sys.exit(1)
         ckpt = torch.load(args.resume, map_location=device)
-        model.load_state_dict(ckpt["model_state_dict"])
-        opt.load_state_dict(ckpt["optimizer_state_dict"])
-        resumed_epoch = ckpt.get("epoch", 0)
-        start_epoch = resumed_epoch + 1
-        best_val = ckpt.get("best_val", float('inf'))
-        best_epoch = ckpt.get("best_epoch", resumed_epoch)
-        # Fast-forward scheduler to the right step
-        sched.step_num = resumed_epoch * steps_per_epoch
-        print(f"Resumed from {args.resume} (epoch {resumed_epoch}, best_val={best_val:.4f}, best_epoch={best_epoch})")
+        try:
+            model.load_state_dict(ckpt["model_state_dict"])
+            # Full match — restore optimizer and training state
+            opt.load_state_dict(ckpt["optimizer_state_dict"])
+            resumed_epoch = ckpt.get("epoch", 0)
+            start_epoch = resumed_epoch + 1
+            best_val = ckpt.get("best_val", float('inf'))
+            best_epoch = ckpt.get("best_epoch", resumed_epoch)
+            sched.step_num = resumed_epoch * steps_per_epoch
+            print(f"Resumed from {args.resume} (epoch {resumed_epoch}, best_val={best_val:.4f}, best_epoch={best_epoch})")
+        except RuntimeError as _load_err:
+            if "size mismatch" not in str(_load_err) and "unexpected key" not in str(_load_err):
+                raise
+            # Vocab or head size mismatch — cross-dataset fine-tune.
+            # Filter checkpoint to only keys with matching shapes, then load strict=False.
+            _model_sd   = model.state_dict()
+            _ckpt_sd    = ckpt["model_state_dict"]
+            _compatible = {k: v for k, v in _ckpt_sd.items()
+                           if k in _model_sd and v.shape == _model_sd[k].shape}
+            _skipped    = len(_ckpt_sd) - len(_compatible)
+            model.load_state_dict(_compatible, strict=False)
+            print(f"Cross-vocab fine-tune: loaded {len(_compatible)}/{len(_ckpt_sd)} layers (skipped {_skipped} shape-mismatched)")
+            # Optimizer and training-state start fresh (mismatched param shapes)
+            print(f"  optimizer and epoch reset — training from epoch 1 on new vocabulary")
 
     # ── epoch loop helpers ─────────────────────────────────────
     def run_epoch(loader, split: str, report_progress: bool = False,
