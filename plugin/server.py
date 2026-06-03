@@ -60,8 +60,14 @@ ROOT: Path = Path(__file__).parent.parent.resolve()
 # get the right packages regardless of which Python launched this server.
 _venv_scripts = "Scripts" if sys.platform == "win32" else "bin"
 _venv_exe     = "python.exe" if sys.platform == "win32" else "python"
-_venv_python  = ROOT / ".venv" / _venv_scripts / _venv_exe
-PYTHON = str(_venv_python) if _venv_python.exists() else sys.executable
+# Check both venv names: .venv (mirror-mirror install) and .venv-ai-music (dev repo)
+_venv_python = next(
+    (ROOT / name / _venv_scripts / _venv_exe
+     for name in (".venv", ".venv-ai-music")
+     if (ROOT / name / _venv_scripts / _venv_exe).exists()),
+    None,
+)
+PYTHON = str(_venv_python) if _venv_python else sys.executable
 
 app = FastAPI(title="AI Music Pipeline Server")
 
