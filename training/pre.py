@@ -1266,7 +1266,10 @@ def main():
     skipped_not_bluesy = 0
     disc_notes_before = 0
     disc_notes_after  = 0
-    _PREVIEW_MAX_SONGS = 10000
+    # Caps keep the UI preview file small enough for the plugin's HTTP client.
+    # JUCE's URL reader silently fails on very large responses (~10MB+).
+    _PREVIEW_MAX_SONGS = 10
+    _PREVIEW_MAX_NOTES_PER_SONG = 800
     disc_preview_songs = []   # filled when disc is active; saved to disc_preview.json
     for _pi, p in enumerate(paths):
         print(f"PREPROCESS {_pi + 1}/{len(paths)}", flush=True)
@@ -1327,7 +1330,7 @@ def main():
                                 "inst": int(e[1]),
                                 "score": round(float(_scores[i]), 3),
                             }
-                            for i, e in enumerate(ev_raw)
+                            for i, e in enumerate(ev_raw[:_PREVIEW_MAX_NOTES_PER_SONG])
                         ],
                     })
 
