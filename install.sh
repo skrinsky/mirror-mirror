@@ -146,6 +146,15 @@ if [[ "$OS" == "Darwin" ]]; then
     ok "Install path recorded for plugin"
 fi
 
+# ── Note discriminator model ──────────────────────────────────────────────────
+DISC_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*combined_model\.pt[^"]*"' | grep -oi 'https://[^"]*' | head -1)"
+if [[ -n "$DISC_URL" ]]; then
+    info "Downloading note filter model..."
+    mkdir -p "$INSTALL_DIR/runs/discriminator"
+    curl -fsSL "$DISC_URL" -o "$INSTALL_DIR/runs/discriminator/combined_model.pt"
+    ok "Note filter model saved"
+fi
+
 # ── Python environment ────────────────────────────────────────────────────────
 info "Setting up Python environment (this may take a few minutes)..."
 PYTHON_BIN="$PYTHON_BIN" bash "$INSTALL_DIR/scripts/setup_venv.sh"
